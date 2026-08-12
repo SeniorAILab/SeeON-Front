@@ -1,7 +1,17 @@
 import { requestJson } from "@/services/apiClient";
-import type { AlertLifecycleStatus, AlertStatus, AlertView, DetectionEvent, DetectionEventType, Level } from "@/types";
+import {
+  SYSTEM_TEST_LABEL,
+  SYSTEM_TEST_MODE,
+  SYSTEM_TEST_TTS_TEXT,
+  type AlertLifecycleStatus,
+  type AlertStatus,
+  type AlertView,
+  type DetectionEvent,
+  type DetectionEventType,
+  type Level,
+} from "@/types";
 
-export interface BackendAlertDto {
+interface BackendOperationalAlertDto {
   alertSeq: string | number;
   id: string;
   backendEventId?: string | null;
@@ -17,7 +27,35 @@ export interface BackendAlertDto {
   detectedAt: string;
   status: string;
   resident?: unknown | null;
+  testMode?: null;
+  source?: string | null;
+  label?: string;
+  ttsText?: string;
 }
+
+export interface BackendSystemTestAlertDto {
+  alertSeq: string | number;
+  id: string;
+  backendEventId: string;
+  facilityId: string;
+  residentId: null;
+  cameraId: null;
+  spaceId: null;
+  room?: null;
+  space?: null;
+  type: typeof SYSTEM_TEST_MODE;
+  source?: typeof SYSTEM_TEST_MODE | null;
+  probability?: null;
+  snapshotKey?: null;
+  detectedAt: string;
+  status: string;
+  resident?: null;
+  testMode: typeof SYSTEM_TEST_MODE;
+  label: typeof SYSTEM_TEST_LABEL;
+  ttsText: typeof SYSTEM_TEST_TTS_TEXT;
+}
+
+export type BackendAlertDto = BackendOperationalAlertDto | BackendSystemTestAlertDto;
 
 export type FrontendAlert = DetectionEvent & {
   alertSeq: string;
@@ -38,9 +76,35 @@ function asNullableString(value: unknown): string | null {
 }
 
 function mapEventType(type: string): DetectionEventType {
+  if (type === SYSTEM_TEST_MODE) return "SYSTEM_TEST";
   if (type === "bed-exit") return "BED_EXIT";
   if (type === "fall") return "FALL_RISK";
   return "OTHER";
+}
+
+function isSystemTestAlertDto(dto: BackendAlertDto): dto is BackendSystemTestAlertDto {
+  return dto.type === SYSTEM_TEST_MODE || dto.testMode === SYSTEM_TEST_MODE;
+}
+
+function assertSystemTestContract(dto: BackendAlertDto): asserts dto is BackendSystemTestAlertDto {
+  if (
+    dto.type !== SYSTEM_TEST_MODE ||
+    dto.testMode !== SYSTEM_TEST_MODE ||
+    dto.label !== SYSTEM_TEST_LABEL ||
+    dto.ttsText !== SYSTEM_TEST_TTS_TEXT ||
+    typeof dto.backendEventId !== "string" ||
+    dto.backendEventId.length === 0 ||
+    dto.spaceId !== null ||
+    dto.residentId !== null ||
+    dto.cameraId !== null ||
+    (dto.room !== undefined && dto.room !== null) ||
+    (dto.space !== undefined && dto.space !== null) ||
+    (dto.source !== undefined && dto.source !== null && dto.source !== SYSTEM_TEST_MODE) ||
+    (dto.probability !== undefined && dto.probability !== null) ||
+    (dto.snapshotKey !== undefined && dto.snapshotKey !== null)
+  ) {
+    throw new Error("Invalid SYSTEM_TEST alert contract");
+  }
 }
 
 function mapStatus(status: string): AlertLifecycleStatus {
@@ -72,13 +136,41 @@ export function mapAlertDto(dto: BackendAlertDto): FrontendAlert {
   const id = asString(dto.id, "id");
   const facilityId = asString(dto.facilityId, "facilityId");
   const type = asString(dto.type, "type");
+  const alertStatus = mapStatus(dto.status);
+
+  if (isSystemTestAlertDto(dto)) {
+    assertSystemTestContract(dto);
+    return {
+      id,
+      backendEventId: dto.backendEventId,
+      alertSeq: String(dto.alertSeq),
+      facilityId,
+      residentId: null,
+      cameraId: null,
+      spaceId: null,
+      eventType: "SYSTEM_TEST",
+      testMode: SYSTEM_TEST_MODE,
+      label: SYSTEM_TEST_LABEL,
+      ttsText: SYSTEM_TEST_TTS_TEXT,
+      riskLevel: "LOW",
+      message: SYSTEM_TEST_LABEL,
+      aiSummary: SYSTEM_TEST_LABEL,
+      detectedAt: asString(dto.detectedAt, "detectedAt"),
+      alertStatus,
+      acknowledgedAt: alertStatus === "ACKNOWLEDGED" ? new Date().toISOString() : undefined,
+      actions: [],
+      emergency: false,
+      backendStatus: dto.status,
+      backendType: SYSTEM_TEST_MODE,
+    };
+  }
+
   const probability = Number(dto.probability);
   if (!Number.isFinite(probability)) throw new Error("Invalid alert probability");
   const room = dto.room ?? dto.space?.name ?? undefined;
   const spaceId = asNullableString(dto.spaceId) ?? "";
   if (!spaceId) throw new Error("Invalid alert spaceId");
   const eventType = mapEventType(type);
-  const alertStatus = mapStatus(dto.status);
 
   return {
     id,
@@ -225,11 +317,14 @@ export interface AlertDto {
   facilityId: string;
   residentId?: string | null;
   cameraId?: string | null;
-  spaceId: string;
-  room?: string;
+  spaceId: string | null;
+  room?: string | null;
   type?: string;
-  probability: number;
+  probability?: number | null;
   snapshotKey?: string | null;
+  testMode?: typeof SYSTEM_TEST_MODE;
+  label?: typeof SYSTEM_TEST_LABEL;
+  ttsText?: typeof SYSTEM_TEST_TTS_TEXT;
   detectedAt: string;
   status?: AlertStatus;
   ackedById?: string | null;
@@ -245,16 +340,31 @@ export interface AlertDto {
 
 export function isAlertDto(value: unknown): value is AlertDto {
   if (!isRecord(value)) return false;
-  return (
+  const common =
     typeof value.id === "string" &&
     typeof value.facilityId === "string" &&
-    typeof value.spaceId === "string" &&
-    typeof value.detectedAt === "string" &&
-    typeof value.probability === "number"
-  );
+    typeof value.detectedAt === "string";
+  if (!common) return false;
+  if (value.type === SYSTEM_TEST_MODE || value.testMode === SYSTEM_TEST_MODE) {
+    return (
+      value.type === SYSTEM_TEST_MODE &&
+      value.testMode === SYSTEM_TEST_MODE &&
+      value.label === SYSTEM_TEST_LABEL &&
+      value.ttsText === SYSTEM_TEST_TTS_TEXT &&
+      typeof value.backendEventId === "string" &&
+      value.spaceId === null &&
+      (value.residentId === undefined || value.residentId === null) &&
+      (value.cameraId === undefined || value.cameraId === null) &&
+      (value.room === undefined || value.room === null) &&
+      (value.probability === undefined || value.probability === null) &&
+      (value.snapshotKey === undefined || value.snapshotKey === null)
+    );
+  }
+  return typeof value.spaceId === "string" && typeof value.probability === "number";
 }
 
 export function mapAlert(dto: AlertDto): AlertView {
+  const systemTest = dto.type === SYSTEM_TEST_MODE && dto.testMode === SYSTEM_TEST_MODE;
   return {
     alertSeq: dto.alertSeq ?? dto.id,
     id: dto.id,
@@ -263,9 +373,12 @@ export function mapAlert(dto: AlertDto): AlertView {
     residentId: dto.residentId ?? null,
     cameraId: dto.cameraId ?? null,
     spaceId: dto.spaceId,
-    room: dto.room ?? dto.space?.name ?? dto.spaceId,
+    room: systemTest ? null : (dto.room ?? dto.space?.name ?? dto.spaceId),
     type: dto.type ?? "fall",
-    probability: dto.probability,
+    ...(systemTest
+      ? { testMode: SYSTEM_TEST_MODE, label: SYSTEM_TEST_LABEL, ttsText: SYSTEM_TEST_TTS_TEXT }
+      : {}),
+    probability: systemTest ? null : (dto.probability ?? 0),
     snapshotKey: dto.snapshotKey ?? null,
     detectedAt: dto.detectedAt,
     status: dto.status ?? "NEW",

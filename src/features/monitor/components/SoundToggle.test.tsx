@@ -85,6 +85,8 @@ describe("SoundToggle — 음성 실패 안내", () => {
       ttsManager.update(
         [
           {
+            identity: "event-sound-failure",
+            kind: "INCIDENT",
             spaceId: "sp_205",
             name: "205호",
             level: "DANGER",

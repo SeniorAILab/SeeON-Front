@@ -30,13 +30,14 @@ const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
 const results = [];
 const actions = [];
 
-for (const mode of ["mixed", "all-live", "panel"]) {
+for (const mode of ["mixed", "all-live", "panel", "system-test"]) {
   const url = `${BASE}?mode=${mode}`;
   await page.goto(url, { waitUntil: "networkidle" });
   actions.push({ type: "navigate", target: url, selector: "body", mode, timestamp: new Date().toISOString() });
   await page.waitForSelector('[data-testid="visual-root"]');
   await page.waitForSelector("[data-space-id]");
   actions.push({ type: "waitForSelector", target: "[data-space-id]", selector: "[data-space-id]", mode, timestamp: new Date().toISOString() });
+  if (mode === "system-test") await page.waitForSelector('[data-test-mode="SYSTEM_TEST"]');
 
   const tiles = await page.$$eval("[data-space-id]", (nodes) =>
     nodes.map((n) => ({
@@ -50,6 +51,14 @@ for (const mode of ["mixed", "all-live", "panel"]) {
   const live = tiles.filter((t) => t.connection === "LIVE").length;
   const stale = tiles.filter((t) => t.connection === "STALE").length;
   const danger = tiles.filter((t) => t.status === "DANGER").length;
+  const systemTests = await page.$$eval('[data-test-mode="SYSTEM_TEST"]', (nodes) =>
+    nodes.map((node) => ({
+      alertId: node.getAttribute("data-alert-id"),
+      backendEventId: node.getAttribute("data-backend-event-id"),
+      correlationId: node.getAttribute("data-correlation-id"),
+      text: node.textContent,
+    })),
+  );
 
   const file = `${outDir}/monitor-${mode}.png`;
   // 요양보호사가 실제로 보는 것은 TV 화면 전체다. 보드 요소만 잘라 찍으면
@@ -65,8 +74,8 @@ for (const mode of ["mixed", "all-live", "panel"]) {
     result: { total: tiles.length, live, stale, danger },
     timestamp: new Date().toISOString(),
   });
-  results.push({ mode, file, total: tiles.length, live, stale, danger, tiles });
-  console.log(`[${mode}] tiles=${tiles.length} live=${live} stale=${stale} danger=${danger} -> ${file}`);
+  results.push({ mode, file, total: tiles.length, live, stale, danger, systemTests, tiles });
+  console.log(`[${mode}] tiles=${tiles.length} live=${live} stale=${stale} danger=${danger} systemTests=${systemTests.length} -> ${file}`);
 }
 
 await browser.close();
@@ -103,4 +112,14 @@ if (allLive.stale !== 0) {
   console.error(`ORACLE FAIL: all-live expected 0 stale, got ${allLive.stale}`);
   process.exit(1);
 }
-console.log("ORACLE PASS: mixed=2 live/5 stale, all-live=0 stale");
+const systemTest = results.find((r) => r.mode === "system-test");
+if (
+  systemTest.systemTests.length !== 1 ||
+  !systemTest.systemTests[0].alertId ||
+  systemTest.systemTests[0].backendEventId !== systemTest.systemTests[0].correlationId ||
+  !systemTest.systemTests[0].text.includes("SYSTEM TEST")
+) {
+  console.error("ORACLE FAIL: SYSTEM TEST presentation/correlation marker missing");
+  process.exit(1);
+}
+console.log("ORACLE PASS: mixed=2 live/5 stale, all-live=0 stale, system-test=1 correlated marker");

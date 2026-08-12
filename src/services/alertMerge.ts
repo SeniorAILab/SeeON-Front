@@ -1,7 +1,7 @@
 import type { DashboardResponse, SpaceStatus } from "@/types";
 import type { FrontendAlert } from "@/services/api/alertEndpoints";
 
-const ACTIVE_BACKEND_TYPES = new Set(["fall", "bed-exit"]);
+const ACTIVE_BACKEND_TYPES = new Set(["fall", "bed-exit", "SYSTEM_TEST"]);
 const RESOLVED_STATUS = "RESOLVED";
 /** 요양보호사가 확인했지만 아직 해결되지 않은 상태(I4로 분리됨). */
 const ACKED_STATUS = "ACKED";
@@ -9,7 +9,7 @@ const ACKED_STATUS = "ACKED";
 export interface AlertUpdateDelta {
   id: string;
   alertSeq: string | number;
-  spaceId: string;
+  spaceId: string | null;
   status: string;
   resolvedById?: string | null;
   resolvedAt?: string | null;
@@ -19,10 +19,38 @@ export interface AlertMergeState {
   byId: Record<string, FrontendAlert>;
   highestSeqByFacility: Record<string, string>;
   terminalResolvedSeqById: Record<string, string>;
+  revisionByFacility: Record<string, number>;
+  revisionByAlertId: Record<string, number>;
+  latestAppliedSnapshotRequestByFacility: Record<string, number>;
+}
+
+export interface AlertSnapshotWatermark {
+  facilityId: string;
+  facilityRevision: number;
+  requestId: number;
 }
 
 export function createAlertMergeState(alerts: FrontendAlert[] = []): AlertMergeState {
-  return mergeAlerts({ byId: {}, highestSeqByFacility: {}, terminalResolvedSeqById: {} }, alerts);
+  return mergeAlerts({
+    byId: {},
+    highestSeqByFacility: {},
+    terminalResolvedSeqById: {},
+    revisionByFacility: {},
+    revisionByAlertId: {},
+    latestAppliedSnapshotRequestByFacility: {},
+  }, alerts);
+}
+
+export function captureAlertSnapshotWatermark(
+  state: AlertMergeState,
+  facilityId: string,
+  requestId: number,
+): AlertSnapshotWatermark {
+  return {
+    facilityId,
+    facilityRevision: state.revisionByFacility[facilityId] ?? 0,
+    requestId,
+  };
 }
 
 export function compareAlertSeq(a: string | number | bigint, b: string | number | bigint): number {
@@ -32,9 +60,19 @@ export function compareAlertSeq(a: string | number | bigint, b: string | number 
 }
 
 export function mergeAlerts(state: AlertMergeState, incoming: FrontendAlert[]): AlertMergeState {
+  return mergeAlertsAtRevision(state, incoming);
+}
+
+function mergeAlertsAtRevision(
+  state: AlertMergeState,
+  incoming: FrontendAlert[],
+  causalRevision?: number,
+): AlertMergeState {
   const byId = { ...state.byId };
   const highestSeqByFacility = { ...state.highestSeqByFacility };
   const terminalResolvedSeqById = { ...state.terminalResolvedSeqById };
+  const revisionByFacility = { ...state.revisionByFacility };
+  const revisionByAlertId = { ...state.revisionByAlertId };
   for (const alert of incoming) {
     const incomingSeq = String(alert.alertSeq);
     const terminalSeq = terminalResolvedSeqById[alert.id];
@@ -45,11 +83,23 @@ export function mergeAlerts(state: AlertMergeState, incoming: FrontendAlert[]): 
     }
 
     const existing = byId[alert.id];
-    if (!existing || compareAlertSeq(incomingSeq, existing.alertSeq) >= 0) byId[alert.id] = alert;
+    if (!existing || compareAlertSeq(incomingSeq, existing.alertSeq) >= 0) {
+      byId[alert.id] = alert;
+      const revision = causalRevision ?? (revisionByFacility[alert.facilityId] ?? 0) + 1;
+      if (causalRevision === undefined) revisionByFacility[alert.facilityId] = revision;
+      revisionByAlertId[alert.id] = revision;
+    }
     const current = highestSeqByFacility[alert.facilityId];
     if (!current || compareAlertSeq(incomingSeq, current) > 0) highestSeqByFacility[alert.facilityId] = incomingSeq;
   }
-  return pruneMergeState({ byId, highestSeqByFacility, terminalResolvedSeqById });
+  return pruneMergeState({
+    byId,
+    highestSeqByFacility,
+    terminalResolvedSeqById,
+    revisionByFacility,
+    revisionByAlertId,
+    latestAppliedSnapshotRequestByFacility: state.latestAppliedSnapshotRequestByFacility,
+  });
 }
 
 /**
@@ -76,8 +126,11 @@ function pruneMergeState(state: AlertMergeState): AlertMergeState {
   const terminalResolvedSeqById = Object.fromEntries(
     Object.entries(state.terminalResolvedSeqById).filter(([id]) => !dropped.has(id))
   );
+  const revisionByAlertId = Object.fromEntries(
+    Object.entries(state.revisionByAlertId).filter(([id]) => !dropped.has(id))
+  );
 
-  return { byId, highestSeqByFacility: state.highestSeqByFacility, terminalResolvedSeqById };
+  return { ...state, byId, terminalResolvedSeqById, revisionByAlertId };
 }
 
 export function mergeAck(state: AlertMergeState, alert: FrontendAlert): AlertMergeState {
@@ -87,6 +140,8 @@ export function mergeAlertUpdates(state: AlertMergeState, incoming: AlertUpdateD
   const byId = { ...state.byId };
   const highestSeqByFacility = { ...state.highestSeqByFacility };
   const terminalResolvedSeqById = { ...state.terminalResolvedSeqById };
+  const revisionByFacility = { ...state.revisionByFacility };
+  const revisionByAlertId = { ...state.revisionByAlertId };
 
   for (const update of incoming) {
     const incomingSeq = String(update.alertSeq);
@@ -105,29 +160,61 @@ export function mergeAlertUpdates(state: AlertMergeState, incoming: AlertUpdateD
         acknowledgedAt: isResolvedBackendStatus(update.status) ? (update.resolvedAt ?? existing.acknowledgedAt) : existing.acknowledgedAt,
         emergency: isResolvedBackendStatus(update.status) ? false : existing.emergency,
       };
+      const revision = (revisionByFacility[existing.facilityId] ?? 0) + 1;
+      revisionByFacility[existing.facilityId] = revision;
+      revisionByAlertId[update.id] = revision;
       const current = highestSeqByFacility[existing.facilityId];
       if (!current || compareAlertSeq(incomingSeq, current) > 0) highestSeqByFacility[existing.facilityId] = incomingSeq;
     }
   }
 
-  return pruneMergeState({ byId, highestSeqByFacility, terminalResolvedSeqById });
+  return pruneMergeState({
+    byId,
+    highestSeqByFacility,
+    terminalResolvedSeqById,
+    revisionByFacility,
+    revisionByAlertId,
+    latestAppliedSnapshotRequestByFacility: state.latestAppliedSnapshotRequestByFacility,
+  });
 }
 
 export function reconcileActiveAlertSnapshot(
   state: AlertMergeState,
   facilityId: string,
-  snapshot: FrontendAlert[]
+  snapshot: FrontendAlert[],
+  watermark: AlertSnapshotWatermark = captureAlertSnapshotWatermark(
+    state,
+    facilityId,
+    (state.latestAppliedSnapshotRequestByFacility[facilityId] ?? 0) + 1,
+  ),
 ): AlertMergeState {
+  const latestAppliedRequest = state.latestAppliedSnapshotRequestByFacility[facilityId] ?? 0;
+  if (watermark.facilityId !== facilityId || watermark.requestId < latestAppliedRequest) return state;
+
   const byId = Object.fromEntries(
-    Object.entries(state.byId).filter(([, alert]) => alert.facilityId !== facilityId || !isActiveAlert(alert))
+    Object.entries(state.byId).filter(([id, alert]) =>
+      alert.facilityId !== facilityId ||
+      !isActiveAlert(alert) ||
+      (state.revisionByAlertId[id] ?? 0) > watermark.facilityRevision
+    ),
+  );
+  const revisionByAlertId = Object.fromEntries(
+    Object.entries(state.revisionByAlertId).filter(([id]) => id in byId),
   );
   const next: AlertMergeState = {
+    ...state,
     byId,
-    highestSeqByFacility: { ...state.highestSeqByFacility },
-    terminalResolvedSeqById: { ...state.terminalResolvedSeqById },
+    revisionByAlertId,
+    latestAppliedSnapshotRequestByFacility: {
+      ...state.latestAppliedSnapshotRequestByFacility,
+      [facilityId]: watermark.requestId,
+    },
   };
-  delete next.highestSeqByFacility[facilityId];
-  return mergeAlerts(next, snapshot.filter((alert) => alert.facilityId === facilityId));
+  const eligibleSnapshot = snapshot.filter((alert) =>
+    alert.facilityId === facilityId &&
+    (state.revisionByAlertId[alert.id] ?? 0) <= watermark.facilityRevision
+  );
+  return mergeAlertsAtRevision(next, eligibleSnapshot, watermark.facilityRevision);
 }
 
 export function alertsForFacility(state: AlertMergeState, facilityId: string): FrontendAlert[] {
@@ -154,7 +241,13 @@ function mapBackendStatusToAlertStatus(status: string): FrontendAlert["alertStat
   return "PENDING";
 }
 
-function statusFromAlert(previous: SpaceStatus | undefined, alert: FrontendAlert): SpaceStatus {
+type SpaceAlert = FrontendAlert & { spaceId: string };
+
+function hasSpace(alert: FrontendAlert): alert is SpaceAlert {
+  return typeof alert.spaceId === "string" && alert.spaceId.length > 0;
+}
+
+function statusFromAlert(previous: SpaceStatus | undefined, alert: SpaceAlert): SpaceStatus {
   return {
     id: previous?.id ?? `status-${alert.spaceId}`,
     spaceId: alert.spaceId,
@@ -189,7 +282,7 @@ function stableClearedStatus(status: SpaceStatus): SpaceStatus {
   };
 }
 
-function normalStatusFromAlert(previous: SpaceStatus | undefined, alert: FrontendAlert): SpaceStatus {
+function normalStatusFromAlert(previous: SpaceStatus | undefined, alert: SpaceAlert): SpaceStatus {
   return stableClearedStatus({
     id: previous?.id ?? `status-${alert.spaceId}`,
     spaceId: alert.spaceId,
@@ -204,8 +297,8 @@ function normalStatusFromAlert(previous: SpaceStatus | undefined, alert: Fronten
   });
 }
 
-function latestBySeq(alerts: FrontendAlert[]): FrontendAlert | undefined {
-  return alerts.reduce<FrontendAlert | undefined>((latest, alert) => {
+function latestBySeq<T extends FrontendAlert>(alerts: T[]): T | undefined {
+  return alerts.reduce<T | undefined>((latest, alert) => {
     if (!latest || compareAlertSeq(alert.alertSeq, latest.alertSeq) > 0) return alert;
     return latest;
   }, undefined);
@@ -215,8 +308,9 @@ export function deriveStatusesFromAlerts(
   baseStatuses: Record<string, SpaceStatus>,
   alerts: FrontendAlert[]
 ): Record<string, SpaceStatus> {
-  const alertsBySpace: Record<string, FrontendAlert[]> = {};
+  const alertsBySpace: Record<string, SpaceAlert[]> = {};
   for (const alert of alerts) {
+    if (!hasSpace(alert)) continue;
     alertsBySpace[alert.spaceId] = [...(alertsBySpace[alert.spaceId] ?? []), alert];
   }
 

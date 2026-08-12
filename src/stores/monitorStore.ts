@@ -6,6 +6,7 @@ import { dashboardService } from "@/services/dashboardService";
 import { recordDashboardDelivery } from "@/services/dashboardReceiptService";
 import {
   alertsForFacility,
+  captureAlertSnapshotWatermark,
   createAlertMergeState,
   deriveStatusesFromAlerts,
   isActiveAlert,
@@ -50,6 +51,7 @@ interface MonitorRun {
   cameraFlight: Promise<void> | null;
   alertCoalesced: boolean;
   cameraCoalesced: boolean;
+  nextAlertSnapshotRequestId: number;
   eventSource: EventSource | null;
   alertListener: EventListener | null;
   alertUpdatedListener: EventListener | null;
@@ -169,7 +171,7 @@ function deriveMergedStatuses(
     Object.entries(statuses).filter(([spaceId]) => activeSpaceIds.has(spaceId)),
   );
   const alerts = alertsForFacility(alertMergeState, activeFacilityId).filter((alert) =>
-    activeSpaceIds.has(alert.spaceId),
+    alert.spaceId !== null && activeSpaceIds.has(alert.spaceId),
   );
   return applyFreshness(deriveStatusesFromAlerts(activeStatuses, alerts));
 }
@@ -230,9 +232,14 @@ function publishMergedState(run: MonitorRun): void {
 }
 
 async function reconcileSnapshot(run: MonitorRun): Promise<void> {
+  const watermark = captureAlertSnapshotWatermark(
+    alertMergeState,
+    run.facilityId,
+    ++run.nextAlertSnapshotRequestId,
+  );
   const alerts = await fetchActiveAlertSnapshot();
   if (!isCurrentRun(run)) return;
-  alertMergeState = reconcileActiveAlertSnapshot(alertMergeState, run.facilityId, alerts);
+  alertMergeState = reconcileActiveAlertSnapshot(alertMergeState, run.facilityId, alerts, watermark);
   recordDeliveries(alerts, run.facilityId);
 }
 
@@ -348,6 +355,7 @@ export const useMonitorStore = create<MonitorState>((set, get) => ({
       cameraFlight: null,
       alertCoalesced: false,
       cameraCoalesced: false,
+      nextAlertSnapshotRequestId: 0,
       eventSource: null,
       alertListener: null,
       alertUpdatedListener: null,

@@ -1,48 +1,40 @@
 import { renderHook } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useTTSAlerts } from "./useTTSAlerts";
 
-class SpeechSynthesisUtteranceStub {
-  lang = "";
-  rate = 1;
-  pitch = 1;
-  volume = 1;
-  onend: (() => void) | null = null;
-  onerror: (() => void) | null = null;
+const updateMock = vi.hoisted(() => vi.fn());
 
-  constructor(_text: string) {}
-}
+vi.mock("@/features/monitor/services/tts/ttsManager", () => ({
+  ttsManager: { update: updateMock },
+}));
 
 describe("useTTSAlerts", () => {
-  afterEach(() => {
-    vi.useRealTimers();
-    vi.unstubAllGlobals();
-  });
+  beforeEach(() => updateMock.mockClear());
 
-  it("silences the real TTS manager when the monitor unmounts", () => {
-    const cancel = vi.fn();
-    vi.stubGlobal("SpeechSynthesisUtterance", SpeechSynthesisUtteranceStub);
-    Object.defineProperty(window, "speechSynthesis", {
-      configurable: true,
-      value: {
-        addEventListener: vi.fn(),
-        cancel,
-        getVoices: vi.fn(() => []),
-        speak: vi.fn(),
-      },
-    });
-    vi.useFakeTimers();
-
+  it("silences the TTS manager when the monitor unmounts", () => {
     const { unmount } = renderHook(() =>
       useTTSAlerts(
-        [{ spaceId: "space_alert", name: "101호", level: "DANGER", reason: "낙상 위험", floorName: "1층" }],
+        [{ identity: "event-unmount", kind: "INCIDENT", spaceId: "space_alert", name: "101호", level: "DANGER", reason: "낙상 위험", floorName: "1층" }],
         true,
       ),
     );
 
-    vi.advanceTimersByTime(1000);
     unmount();
 
-    expect(cancel).toHaveBeenCalledOnce();
+    expect(updateMock).toHaveBeenLastCalledWith([], false);
+  });
+
+  it("synchronizes two distinct alert identities in the same space", () => {
+    const first = [{ identity: "event-1", kind: "INCIDENT" as const, spaceId: "space_alert", name: "101호", level: "DANGER" as const, reason: "", floorName: "1층" }];
+    const second = [{ identity: "event-2", kind: "INCIDENT" as const, spaceId: "space_alert", name: "101호", level: "DANGER" as const, reason: "", floorName: "1층" }];
+
+    const { rerender } = renderHook(
+      ({ alerts }) => useTTSAlerts(alerts, true),
+      { initialProps: { alerts: first } },
+    );
+    rerender({ alerts: second });
+
+    expect(updateMock).toHaveBeenCalledTimes(2);
+    expect(updateMock).toHaveBeenLastCalledWith(second, true);
   });
 });

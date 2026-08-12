@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  captureAlertSnapshotWatermark,
   compareAlertSeq,
   createAlertMergeState,
   deriveStatusesFromAlerts,
@@ -79,6 +80,124 @@ describe("alertMerge", () => {
     state = mergeAlerts(state, [alert(), alert(), alert()]);
     expect(Object.values(state.byId)).toHaveLength(1);
     expect(state.highestSeqByFacility[SCOPED_FACILITY_ID]).toBe("1");
+  });
+
+  it("reconciles SSE, REST polling, and replay once by alert identity while preserving distinct same-space events", () => {
+    const first = alert({ id: "alert-event-1", backendEventId: "event-1", alertSeq: "1" });
+    const second = alert({ id: "alert-event-2", backendEventId: "event-2", alertSeq: "2" });
+
+    let state = createAlertMergeState();
+    state = mergeAlerts(state, [first]);
+    state = reconcileActiveAlertSnapshot(state, SCOPED_FACILITY_ID, [first]);
+    state = mergeAlerts(state, [first]);
+    expect(alertsForFacility(state, SCOPED_FACILITY_ID).map((item) => item.id)).toEqual([first.id]);
+
+    state = mergeAlerts(state, [second]);
+    expect(alertsForFacility(state, SCOPED_FACILITY_ID).map((item) => item.id)).toEqual([second.id, first.id]);
+  });
+
+  it("keeps SSE alerts newer than an in-flight empty snapshot while removing older resolved alerts", () => {
+    const beforeRequest = alert({ id: "before-request", alertSeq: "10" });
+    const duringRequest = alert({ id: "during-request", alertSeq: "11" });
+    let state = createAlertMergeState([beforeRequest]);
+    const request = captureAlertSnapshotWatermark(state, SCOPED_FACILITY_ID, 1);
+
+    state = mergeAlerts(state, [duringRequest]);
+    state = reconcileActiveAlertSnapshot(state, SCOPED_FACILITY_ID, [], request);
+
+    expect(alertsForFacility(state, SCOPED_FACILITY_ID).map((item) => item.id)).toEqual([
+      duringRequest.id,
+    ]);
+  });
+
+  it("prevents an older overlapping partial snapshot from resurrecting alerts after a newer completion", () => {
+    const resolvedOnServer = alert({ id: "resolved-on-server", alertSeq: "10" });
+    const duringFirst = alert({ id: "during-first", alertSeq: "11" });
+    const duringSecond = alert({ id: "during-second", alertSeq: "12" });
+    let state = createAlertMergeState([resolvedOnServer]);
+    const firstRequest = captureAlertSnapshotWatermark(state, SCOPED_FACILITY_ID, 1);
+
+    state = mergeAlerts(state, [duringFirst]);
+    const secondRequest = captureAlertSnapshotWatermark(state, SCOPED_FACILITY_ID, 2);
+    state = mergeAlerts(state, [duringSecond]);
+    state = reconcileActiveAlertSnapshot(state, SCOPED_FACILITY_ID, [duringFirst], secondRequest);
+    state = reconcileActiveAlertSnapshot(state, SCOPED_FACILITY_ID, [resolvedOnServer], firstRequest);
+
+    expect(alertsForFacility(state, SCOPED_FACILITY_ID).map((item) => item.id)).toEqual([
+      duringSecond.id,
+      duringFirst.id,
+    ]);
+  });
+
+  it("lets a newer empty snapshot remove an older partial result but not SSE received during the newer request", () => {
+    const duringFirst = alert({ id: "during-first-request", alertSeq: "20" });
+    const fromOlderPartial = alert({ id: "from-older-partial", alertSeq: "21" });
+    const duringSecond = alert({ id: "during-second-request", alertSeq: "22" });
+    let state = createAlertMergeState();
+    const firstRequest = captureAlertSnapshotWatermark(state, SCOPED_FACILITY_ID, 1);
+    state = mergeAlerts(state, [duringFirst]);
+    const secondRequest = captureAlertSnapshotWatermark(state, SCOPED_FACILITY_ID, 2);
+
+    state = reconcileActiveAlertSnapshot(state, SCOPED_FACILITY_ID, [fromOlderPartial], firstRequest);
+    state = mergeAlerts(state, [duringSecond]);
+    state = reconcileActiveAlertSnapshot(state, SCOPED_FACILITY_ID, [], secondRequest);
+
+    expect(alertsForFacility(state, SCOPED_FACILITY_ID).map((item) => item.id)).toEqual([
+      duringSecond.id,
+    ]);
+  });
+
+  it("keeps a same-ID SSE replay received during a stale empty snapshot as one alert", () => {
+    const replayed = alert({ id: "same-id-replay", alertSeq: "20" });
+    let state = createAlertMergeState([replayed]);
+    const request = captureAlertSnapshotWatermark(state, SCOPED_FACILITY_ID, 1);
+
+    state = mergeAlerts(state, [replayed]);
+    state = reconcileActiveAlertSnapshot(state, SCOPED_FACILITY_ID, [], request);
+
+    expect(alertsForFacility(state, SCOPED_FACILITY_ID)).toEqual([replayed]);
+  });
+
+  it("reconciles only the requested facility when SSE arrives during an empty snapshot", () => {
+    const otherFacilityId = "facility-other";
+    const scopedBefore = alert({ id: "scoped-before", alertSeq: "30" });
+    const scopedDuring = alert({ id: "scoped-during", alertSeq: "31" });
+    const other = alert({ id: "other-alert", alertSeq: "40", facilityId: otherFacilityId });
+    let state = createAlertMergeState([scopedBefore, other]);
+    const request = captureAlertSnapshotWatermark(state, SCOPED_FACILITY_ID, 1);
+
+    state = mergeAlerts(state, [scopedDuring]);
+    state = reconcileActiveAlertSnapshot(state, SCOPED_FACILITY_ID, [], request);
+
+    expect(alertsForFacility(state, SCOPED_FACILITY_ID).map((item) => item.id)).toEqual([
+      scopedDuring.id,
+    ]);
+    expect(alertsForFacility(state, otherFacilityId)).toEqual([other]);
+  });
+
+  it("keeps SYSTEM_TEST active and visible without deriving a room danger status", () => {
+    const system = alert({
+      id: "alert-system-merge",
+      backendEventId: "event-system-merge",
+      alertSeq: "3",
+      spaceId: null,
+      room: undefined,
+      cameraId: null,
+      eventType: "SYSTEM_TEST",
+      riskLevel: "LOW",
+      emergency: false,
+      backendType: "SYSTEM_TEST",
+      testMode: "SYSTEM_TEST",
+      label: "SYSTEM TEST - NOT A RESIDENT ALERT",
+      ttsText: "System test emergency notification",
+    } as unknown as Partial<FrontendAlert>);
+
+    const merged = mergeAlertsIntoDashboard(dashboard(), [system]);
+
+    expect(isActiveAlert(system)).toBe(true);
+    expect(merged.unacknowledgedEvents).toEqual([system]);
+    expect(merged.statuses).toEqual({});
+    expect(merged.summary).toMatchObject({ danger: 0, checkNeeded: 0, unacknowledged: 1 });
   });
 
   it("test_alert_seq_comparison_is_numeric_not_lexicographic", () => {

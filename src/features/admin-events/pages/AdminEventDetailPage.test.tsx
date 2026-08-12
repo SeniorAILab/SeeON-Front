@@ -106,6 +106,43 @@ afterEach(() => {
 });
 
 describe("AdminEventDetailPage alert evidence integration", () => {
+  it("renders SYSTEM_TEST detail without room, risk, AI, or media assumptions", async () => {
+    vi.stubEnv("VITE_EVENT_CLIPS_ENABLED", "true");
+    vi.mocked(eventService.getById).mockResolvedValue({
+      ...EVENT,
+      id: "alert-system-detail",
+      backendEventId: "event-system-detail",
+      spaceId: null,
+      room: undefined,
+      cameraId: null,
+      residentId: null,
+      eventType: "SYSTEM_TEST",
+      testMode: "SYSTEM_TEST",
+      label: "SYSTEM TEST - NOT A RESIDENT ALERT",
+      ttsText: "System test emergency notification",
+      riskLevel: "LOW",
+      message: "SYSTEM TEST - NOT A RESIDENT ALERT",
+      aiSummary: "SYSTEM TEST - NOT A RESIDENT ALERT",
+    });
+
+    const { container } = render(
+      <MemoryRouter initialEntries={["/events/alert-system-detail"]}>
+        <Routes>
+          <Route path="/events/:eventId" element={<AdminEventDetailPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByRole("heading", { name: "SYSTEM TEST" })).toBeTruthy();
+    const card = container.querySelector('[data-test-mode="SYSTEM_TEST"]');
+    expect(card?.getAttribute("data-alert-id")).toBe("alert-system-detail");
+    expect(card?.getAttribute("data-backend-event-id")).toBe("event-system-detail");
+    expect(card?.textContent).not.toContain("101호");
+    expect(screen.queryByText(/AI 안전 분석/)).toBeNull();
+    expect(screen.queryByRole("heading", { name: "감지 근거 영상" })).toBeNull();
+    expect(alertService.getMedia).not.toHaveBeenCalled();
+  });
+
   it("keeps the evidence card and metadata request off by default", async () => {
     vi.stubEnv("VITE_EVENT_CLIPS_ENABLED", undefined);
     renderDetail();

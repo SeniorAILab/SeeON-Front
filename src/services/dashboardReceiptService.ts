@@ -9,7 +9,9 @@ const CLIENT_ID_STORAGE_KEY = "eldercare.dashboard-client-id.v1";
 
 export type DashboardReceiptSurfaceBase =
   | "admin-room-board"
-  | "monitor-room-board";
+  | "monitor-room-board"
+  | "admin-system-test-banner"
+  | "monitor-system-test-banner";
 
 export type DashboardReceiptSurface =
   `${DashboardReceiptSurfaceBase}:${"overview" | "focus"}`;

@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { playTTS } from "./playTTS";
-import { TTSManager, type TTSAlertInput } from "./ttsManager";
+import {
+  TTSManager,
+  type TTSAlertInput,
+  type TTSIncidentAlertInput,
+} from "./ttsManager";
 
 vi.mock("./playTTS", () => ({
   playTTS: vi.fn(() => Promise.resolve({ ok: true })),
@@ -17,7 +21,11 @@ function deferred<T>() {
   return { promise, resolve };
 }
 
-function incident(identity: string, spaceId = "space-1", level: "EMERGENCY" | "DANGER" | "CAUTION" = "DANGER"): TTSAlertInput {
+function incident(
+  identity: string,
+  spaceId = "space-1",
+  level: "EMERGENCY" | "DANGER" | "CAUTION" = "DANGER",
+): TTSIncidentAlertInput {
   return {
     identity,
     kind: "INCIDENT",
@@ -26,7 +34,7 @@ function incident(identity: string, spaceId = "space-1", level: "EMERGENCY" | "D
     level,
     reason: "",
     floorName: "1층",
-  } as TTSAlertInput;
+  };
 }
 
 function systemTest(identity: string): TTSAlertInput {
@@ -118,16 +126,43 @@ describe("TTSManager event identity", () => {
     expect(playTTSMock).toHaveBeenCalledTimes(3);
   });
 
-  it("keeps the immediate queue bounded while preserving insertion order", async () => {
+  it("retains the 30s, 120s, and 300s re-announcement schedule", async () => {
     const manager = new TTSManager();
-    const alerts = Array.from({ length: 250 }, (_, index) =>
-      incident(`event-bounded-${index}`, `space-${index}`),
-    );
+
+    manager.update([incident("event-reannounce")], true);
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(playTTSMock).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(29_999);
+    expect(playTTSMock).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(playTTSMock).toHaveBeenCalledTimes(2);
+
+    await vi.advanceTimersByTimeAsync(119_999);
+    expect(playTTSMock).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(playTTSMock).toHaveBeenCalledTimes(3);
+
+    await vi.advanceTimersByTimeAsync(299_999);
+    expect(playTTSMock).toHaveBeenCalledTimes(3);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(playTTSMock).toHaveBeenCalledTimes(4);
+  });
+
+  it("does not truncate distinct equal-priority normal incidents and preserves insertion order", async () => {
+    const manager = new TTSManager();
+    const alerts = Array.from({ length: 250 }, (_, index) => ({
+      ...incident(`event-unbounded-${index}`, `space-${index}`),
+      name: `${index}호`,
+    }));
 
     manager.update(alerts, true);
     await vi.advanceTimersByTimeAsync(1_000);
 
-    expect(playTTSMock).toHaveBeenCalledTimes(200);
+    expect(playTTSMock).toHaveBeenCalledTimes(250);
+    expect(playTTSMock.mock.calls.map(([text]) => text)).toEqual(
+      alerts.map((alert) => `${alert.name}에서 위험 발생, 확인이 필요합니다`),
+    );
   });
 
   it("keeps normal bed-exit danger speech unchanged", async () => {

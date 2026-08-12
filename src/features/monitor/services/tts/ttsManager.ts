@@ -41,7 +41,6 @@ const AUDIO_LEVEL: Record<TTSLevel, AudioLevel> = {
   CAUTION: "caution",
 };
 const REANNOUNCE_MS = [30_000, 120_000, 300_000];
-const MAX_QUEUE_ITEMS = 200;
 const MAX_SPOKEN_IDENTITIES = 1_000;
 
 type Item = TTSAlertInput & {
@@ -120,8 +119,6 @@ export class TTSManager {
           : textFor(item.name, AUDIO_LEVEL[item.level]),
       });
       this.queue.sort((a, b) => a.priority - b.priority || a.ordinal - b.ordinal);
-      if (this.queue.length > MAX_QUEUE_ITEMS) this.queue.length = MAX_QUEUE_ITEMS;
-      if (!this.queue.some((utterance) => utterance.identity === item.identity)) continue;
       const delay = REANNOUNCE_MS[Math.min(item.announces, REANNOUNCE_MS.length - 1)];
       item.announces += 1;
       item.nextAt = now + delay;

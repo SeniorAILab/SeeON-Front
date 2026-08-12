@@ -8,7 +8,35 @@ export function setUnauthorizedHandler(handler: UnauthorizedHandler): void {
   unauthorizedHandler = handler;
 }
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "/api/v1";
+const DEFAULT_DEV_API_BASE_URL = "/api/v1";
+
+/**
+ * Resolve the browser API base.
+ * - Development keeps relative `/api/v1` (Vite proxies `/api`).
+ * - Production accepts only absolute HTTPS bases; unset is allowed so the
+ *   static shell can build before an HTTPS API origin exists.
+ */
+export function resolveApiBaseUrl(
+  viteApiBaseUrl: string | undefined,
+  isProd: boolean,
+): string {
+  const raw = viteApiBaseUrl?.trim() ?? "";
+  if (!isProd) {
+    return raw.length > 0 ? raw : DEFAULT_DEV_API_BASE_URL;
+  }
+  if (raw.length === 0) return "";
+  if (!/^https:\/\//i.test(raw)) {
+    throw new Error(
+      "VITE_API_BASE_URL must be an absolute HTTPS URL in production",
+    );
+  }
+  return raw.replace(/\/+$/, "");
+}
+
+const API_BASE_URL = resolveApiBaseUrl(
+  import.meta.env.VITE_API_BASE_URL,
+  import.meta.env.PROD,
+);
 
 const SSE_PATH = "/dashboard/stream";
 const FACILITY_SCOPE_HEADER = "X-Facility-Id";

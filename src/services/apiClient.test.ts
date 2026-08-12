@@ -284,3 +284,73 @@ describe("apiErrorMessage", () => {
     ).toBe(fallback);
   });
 });
+
+describe("apiClient production API base contract", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
+
+  it("keeps the development default at relative /api/v1", async () => {
+    const { resolveApiBaseUrl } = await import("./apiClient");
+
+    expect(resolveApiBaseUrl(undefined, false)).toBe("/api/v1");
+    expect(resolveApiBaseUrl("", false)).toBe("/api/v1");
+    expect(resolveApiBaseUrl("/api/v1", false)).toBe("/api/v1");
+  });
+
+  it("accepts only absolute HTTPS API bases in production", async () => {
+    const { resolveApiBaseUrl } = await import("./apiClient");
+
+    expect(
+      resolveApiBaseUrl("https://api.example.com/api/v1", true),
+    ).toBe("https://api.example.com/api/v1");
+    expect(
+      resolveApiBaseUrl("https://api.example.com/api/v1/", true),
+    ).toBe("https://api.example.com/api/v1");
+  });
+
+  it("allows an unset production API base so the static shell can still build", async () => {
+    const { resolveApiBaseUrl } = await import("./apiClient");
+
+    expect(resolveApiBaseUrl(undefined, true)).toBe("");
+    expect(resolveApiBaseUrl("", true)).toBe("");
+  });
+
+  it("rejects relative and HTTP production API bases", async () => {
+    const { resolveApiBaseUrl } = await import("./apiClient");
+
+    expect(() => resolveApiBaseUrl("/api/v1", true)).toThrow(
+      /absolute HTTPS/i,
+    );
+    expect(() =>
+      resolveApiBaseUrl("http://localhost:8080/api/v1", true),
+    ).toThrow(/absolute HTTPS/i);
+    expect(() =>
+      resolveApiBaseUrl("http://49.247.204.81/api/v1", true),
+    ).toThrow(/absolute HTTPS/i);
+    expect(() => resolveApiBaseUrl("not-a-url", true)).toThrow(
+      /absolute HTTPS/i,
+    );
+  });
+
+  it("builds request URLs from an absolute API base through the sole fetch seam", async () => {
+    vi.stubEnv("VITE_API_BASE_URL", "https://api.example.com/api/v1");
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(okJsonResponse({ ok: true }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { requestJson, resolveApiBaseUrl } = await import("./apiClient");
+    expect(resolveApiBaseUrl("https://api.example.com/api/v1", true)).toBe(
+      "https://api.example.com/api/v1",
+    );
+
+    await requestJson("/health");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.example.com/api/v1/health",
+      expect.objectContaining({ credentials: "include" }),
+    );
+  });
+});

@@ -52,7 +52,11 @@ export function AdminEventDetailPage() {
     if (!eventId) return;
     const ev = await eventService.getById(eventId);
     setEvent(ev ?? null);
-    if (ev) {
+    if (ev?.testMode === "SYSTEM_TEST") {
+      setSpace(null);
+      setFloor(null);
+      setTimeline([]);
+    } else if (ev) {
       const dashboard = await dashboardService.getDashboard(ev.facilityId);
       const matchedSpace = dashboard.spaces.find((s) => s.id === ev.spaceId) ?? null;
       setSpace(matchedSpace);
@@ -120,6 +124,35 @@ export function AdminEventDetailPage() {
   const adminNotes = event.actions.filter((action) => "authorRole" in action && action.authorRole === "ADMIN");
   const staffNotes = event.actions.filter((action) => !("authorRole" in action) || action.authorRole === "STAFF");
 
+  if (event.testMode === "SYSTEM_TEST") {
+    return (
+      <div className="mx-auto max-w-3xl space-y-5">
+        <button
+          onClick={() => navigate(-1)}
+          className="inline-flex items-center gap-1.5 text-sm text-ink-soft hover:text-ink"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          이벤트 목록
+        </button>
+        <Card
+          data-alert-id={event.id}
+          data-backend-event-id={event.backendEventId ?? undefined}
+          data-correlation-id={event.backendEventId ?? event.id}
+          data-test-mode="SYSTEM_TEST"
+          data-status="SYSTEM_TEST"
+          className="border-2 border-dashed border-ink-faint bg-surface2 p-5"
+        >
+          <h1 className="text-xl font-black tracking-wide text-ink">SYSTEM TEST</h1>
+          <p className="mt-2 text-sm font-bold text-ink-soft">{event.label}</p>
+          <p className="mt-2 text-sm text-ink-faint">{formatDateTime(event.detectedAt)}</p>
+          <div className="mt-4 flex items-center gap-2">
+            <AlertStatusBadge status={event.alertStatus} />
+            <span className="text-xs text-ink-faint">{alertLabel[event.alertStatus]}</span>
+          </div>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-3xl space-y-5">

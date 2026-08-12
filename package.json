@@ -1,9 +1,13 @@
 {
-  "name": "front",
+  "name": "seeon-front",
   "private": true,
   "version": "0.1.0",
   "type": "module",
   "description": "Senior AI Lab - AI 기반 요양원 상태 모니터링 대시보드",
+  "packageManager": "pnpm@10.32.1",
+  "engines": {
+    "node": "24.x"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",

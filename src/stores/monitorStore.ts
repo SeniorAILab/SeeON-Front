@@ -34,37 +34,65 @@ interface MonitorState {
   setSound: (on: boolean) => void;
 }
 
-let unsub: (() => void) | null = null;
+const ALERT_RECONCILE_MS = 60_000;
+const CAMERA_REFRESH_MS = 30_000;
+const SSE_FALLBACK_MS = 3_000;
+
+interface MonitorRun {
+  generation: number;
+  facilityId: string;
+  stopped: boolean;
+  sseHealthy: boolean;
+  alertTimer: ReturnType<typeof setTimeout> | null;
+  cameraTimer: ReturnType<typeof setTimeout> | null;
+  fallbackTimer: ReturnType<typeof setTimeout> | null;
+  alertFlight: Promise<void> | null;
+  cameraFlight: Promise<void> | null;
+  alertCoalesced: boolean;
+  cameraCoalesced: boolean;
+  eventSource: EventSource | null;
+  alertListener: EventListener | null;
+  alertUpdatedListener: EventListener | null;
+  sessionInvalidListener: EventListener | null;
+  visibilityListener: (() => void) | null;
+  onlineListener: (() => void) | null;
+}
+
 let alertMergeState: AlertMergeState = createAlertMergeState();
 let activeFacilityId: string | null = null;
-let pollTimer: ReturnType<typeof setInterval> | null = null;
-/**
- * SSE 실시간 채널이 살아 있는지. REST 폴링 성공과 **별개로** 추적한다.
- *
- * 이걸 분리하지 않으면 SSE가 끊긴 뒤에도 6초 REST 폴링이 성공할 때마다
- * connection이 NORMAL로 덮여 장애가 화면에서 사라진다. 실시간 알림이
- * 안 오는데 배지는 정상이라고 말하는 상태가 제일 위험하다.
- */
-let sseHealthy = false;
-/** spaceId → 카메라 신선도. 카메라 조회 실패 시 직전 값을 유지한다. */
 let freshnessBySpace: Record<string, SpaceFreshness> = {};
+let currentRun: MonitorRun | null = null;
+let nextGeneration = 0;
+
+function isCurrentRun(run: MonitorRun): boolean {
+  return (
+    currentRun?.generation === run.generation &&
+    !run.stopped &&
+    activeFacilityId === run.facilityId
+  );
+}
 
 /** REST 스냅샷 성공만으로는 NORMAL을 주장할 수 없다. SSE가 살아 있어야 한다. */
-function connectionAfterRestSuccess(): ConnectionState {
-  return sseHealthy ? "NORMAL" : "RECONNECTING";
+function connectionAfterRestSuccess(run: MonitorRun): ConnectionState {
+  return run.sseHealthy ? "NORMAL" : "RECONNECTING";
+}
+
+function jitteredDelay(baseMs: number): number {
+  return Math.round(baseMs * (1.05 + Math.random() * 0.05));
 }
 
 /**
- * 카메라 신선도를 갱신한다. 실패해도 대시보드 갱신을 막지 않되,
- * 직전 신선도를 그대로 두어 "모르는 사이 정상으로 보이는" 상태를 만들지 않는다.
+ * 카메라 조회가 실패하면 직전 신선도를 유지한다. 실행 세대가 바뀐 뒤 도착한
+ * 응답은 같은 시설 ID여도 폐기한다.
  */
-async function refreshCameraFreshness(facilityId: string): Promise<void> {
+async function refreshCameraFreshness(run: MonitorRun): Promise<boolean> {
   try {
     const cameras = await listCameras();
-    if (!isActiveFacility(facilityId)) return;
+    if (!isCurrentRun(run)) return false;
     freshnessBySpace = buildFreshnessBySpace(cameras, Date.now());
+    return true;
   } catch {
-    // 유지. 비워버리면 STALE 표시가 사라져 죽은 카메라가 정상으로 읽힌다.
+    return false;
   }
 }
 
@@ -79,10 +107,6 @@ function applyFreshness(statuses: Record<string, SpaceStatus>): Record<string, S
   }
   return next;
 }
-function isActiveFacility(facilityId: string): boolean {
-  return activeFacilityId === facilityId;
-}
-
 // Single funnel for delivery receipts: every alert-arrival path goes through
 // here, and alerts from another facility (e.g. a facility-switch race) are
 // dropped before they can 404 against the session-scoped backend lookup.
@@ -94,11 +118,46 @@ function recordDeliveries(alerts: readonly FrontendAlert[], facilityId: string):
 }
 
 
-function closeLiveConnection(): void {
-  unsub?.();
-  unsub = null;
-  if (pollTimer) clearInterval(pollTimer);
-  pollTimer = null;
+function clearRunTimer(timer: ReturnType<typeof setTimeout> | null): void {
+  if (timer !== null) clearTimeout(timer);
+}
+
+function teardownRun(run: MonitorRun): void {
+  if (run.stopped) return;
+  run.stopped = true;
+  clearRunTimer(run.alertTimer);
+  clearRunTimer(run.cameraTimer);
+  clearRunTimer(run.fallbackTimer);
+  run.alertTimer = null;
+  run.cameraTimer = null;
+  run.fallbackTimer = null;
+  run.alertCoalesced = false;
+  run.cameraCoalesced = false;
+
+  if (run.eventSource) {
+    if (typeof run.eventSource.removeEventListener === "function") {
+      if (run.alertListener) run.eventSource.removeEventListener("alert", run.alertListener);
+      if (run.alertUpdatedListener) run.eventSource.removeEventListener("alert-updated", run.alertUpdatedListener);
+      if (run.sessionInvalidListener) run.eventSource.removeEventListener("session-invalid", run.sessionInvalidListener);
+    }
+    run.eventSource.onopen = null;
+    run.eventSource.onerror = null;
+    run.eventSource.close();
+  }
+  run.eventSource = null;
+  run.alertListener = null;
+  run.alertUpdatedListener = null;
+  run.sessionInvalidListener = null;
+
+  if (run.visibilityListener && typeof document !== "undefined") {
+    document.removeEventListener("visibilitychange", run.visibilityListener);
+  }
+  if (run.onlineListener && typeof window !== "undefined") {
+    window.removeEventListener("online", run.onlineListener);
+  }
+  run.visibilityListener = null;
+  run.onlineListener = null;
+  if (currentRun === run) currentRun = null;
 }
 function deriveMergedStatuses(
   dashboard: DashboardResponse | null,
@@ -157,11 +216,106 @@ function dashboardWithStatuses(
   };
 }
 
-async function reconcileSnapshot(facilityId: string): Promise<void> {
+function publishMergedState(run: MonitorRun): void {
+  if (!isCurrentRun(run)) return;
+  useMonitorStore.setState((state) => {
+    const statuses = deriveMergedStatuses(state.dashboard, state.statuses);
+    return {
+      dashboard: dashboardWithStatuses(state.dashboard, statuses),
+      statuses,
+      connection: connectionAfterRestSuccess(run),
+      lastUpdateAt: new Date().toISOString(),
+    };
+  });
+}
+
+async function reconcileSnapshot(run: MonitorRun): Promise<void> {
   const alerts = await fetchActiveAlertSnapshot();
-  if (!isActiveFacility(facilityId)) return;
-  alertMergeState = reconcileActiveAlertSnapshot(alertMergeState, facilityId, alerts);
-  recordDeliveries(alerts, facilityId);
+  if (!isCurrentRun(run)) return;
+  alertMergeState = reconcileActiveAlertSnapshot(alertMergeState, run.facilityId, alerts);
+  recordDeliveries(alerts, run.facilityId);
+}
+
+function requestAlertSync(run: MonitorRun): Promise<void> {
+  if (!isCurrentRun(run)) return Promise.resolve();
+  if (run.alertFlight) {
+    run.alertCoalesced = true;
+    return run.alertFlight;
+  }
+
+  const execute = async () => {
+    do {
+      run.alertCoalesced = false;
+      try {
+        await reconcileSnapshot(run);
+        publishMergedState(run);
+      } catch {
+        if (isCurrentRun(run) && !run.sseHealthy) {
+          useMonitorStore.setState({ connection: "RECONNECTING" });
+        }
+      }
+    } while (isCurrentRun(run) && run.alertCoalesced);
+  };
+  const flight = execute().finally(() => {
+    if (run.alertFlight === flight) run.alertFlight = null;
+  });
+  run.alertFlight = flight;
+  return flight;
+}
+
+function requestCameraSync(run: MonitorRun): Promise<void> {
+  if (!isCurrentRun(run)) return Promise.resolve();
+  if (run.cameraFlight) {
+    run.cameraCoalesced = true;
+    return run.cameraFlight;
+  }
+
+  const execute = async () => {
+    do {
+      run.cameraCoalesced = false;
+      if (await refreshCameraFreshness(run)) publishMergedState(run);
+    } while (isCurrentRun(run) && run.cameraCoalesced);
+  };
+  const flight = execute().finally(() => {
+    if (run.cameraFlight === flight) run.cameraFlight = null;
+  });
+  run.cameraFlight = flight;
+  return flight;
+}
+
+function scheduleAlertReconciliation(run: MonitorRun): void {
+  if (!isCurrentRun(run) || run.alertTimer !== null) return;
+  run.alertTimer = setTimeout(() => {
+    run.alertTimer = null;
+    void requestAlertSync(run).finally(() => scheduleAlertReconciliation(run));
+  }, jitteredDelay(ALERT_RECONCILE_MS));
+}
+
+function scheduleCameraRefresh(run: MonitorRun): void {
+  if (!isCurrentRun(run) || run.cameraTimer !== null) return;
+  run.cameraTimer = setTimeout(() => {
+    run.cameraTimer = null;
+    void requestCameraSync(run).finally(() => scheduleCameraRefresh(run));
+  }, jitteredDelay(CAMERA_REFRESH_MS));
+}
+
+function cancelFallback(run: MonitorRun): void {
+  clearRunTimer(run.fallbackTimer);
+  run.fallbackTimer = null;
+}
+
+function scheduleFallback(run: MonitorRun): void {
+  if (!isCurrentRun(run) || run.sseHealthy || run.fallbackTimer !== null) return;
+  run.fallbackTimer = setTimeout(() => {
+    run.fallbackTimer = null;
+    void requestAlertSync(run).finally(() => scheduleFallback(run));
+  }, jitteredDelay(SSE_FALLBACK_MS));
+}
+
+function requestImmediateSync(run: MonitorRun): void {
+  if (!isCurrentRun(run)) return;
+  void requestAlertSync(run);
+  void requestCameraSync(run);
 }
 
 function eventSourceFor(facilityId: string): EventSource {
@@ -178,66 +332,91 @@ export const useMonitorStore = create<MonitorState>((set, get) => ({
   running: false,
   soundEnabled: false,
 
-  start: (facilityId, intervalMs = 3000) => {
-
+  start: (facilityId, _intervalMs) => {
     if (activeFacilityId === facilityId && get().running) return;
-    closeLiveConnection();
+    if (currentRun) teardownRun(currentRun);
+
+    const run: MonitorRun = {
+      generation: ++nextGeneration,
+      facilityId,
+      stopped: false,
+      sseHealthy: false,
+      alertTimer: null,
+      cameraTimer: null,
+      fallbackTimer: null,
+      alertFlight: null,
+      cameraFlight: null,
+      alertCoalesced: false,
+      cameraCoalesced: false,
+      eventSource: null,
+      alertListener: null,
+      alertUpdatedListener: null,
+      sessionInvalidListener: null,
+      visibilityListener: null,
+      onlineListener: null,
+    };
+    currentRun = run;
     activeFacilityId = facilityId;
     useFacilityStore.getState().setFacility(facilityId);
     alertMergeState = createAlertMergeState();
-    // 새 시설로 갈아타면 이전 시설의 SSE 생존/신선도를 물려받지 않는다.
-    sseHealthy = false;
     freshnessBySpace = {};
     set({ running: true, loading: true, connection: "RECONNECTING" });
-    dashboardService.getDashboard(facilityId).then(async (dashboard) => {
-      if (!isActiveFacility(facilityId)) return;
+
+    run.visibilityListener = () => {
+      if (document.visibilityState === "visible") requestImmediateSync(run);
+    };
+    run.onlineListener = () => requestImmediateSync(run);
+    if (typeof document !== "undefined") {
+      document.addEventListener("visibilitychange", run.visibilityListener);
+    }
+    if (typeof window !== "undefined") window.addEventListener("online", run.onlineListener);
+    scheduleAlertReconciliation(run);
+    scheduleCameraRefresh(run);
+
+    void dashboardService.getDashboard(facilityId).then(async (dashboard) => {
+      if (!isCurrentRun(run)) return;
       alertMergeState = createAlertMergeState(dashboard.unacknowledgedEvents as FrontendAlert[]);
       recordDeliveries(dashboard.unacknowledgedEvents as FrontendAlert[], facilityId);
-      await reconcileSnapshot(facilityId);
-      await refreshCameraFreshness(facilityId);
-      if (!isActiveFacility(facilityId)) return;
-      const statuses = deriveMergedStatuses(dashboard, dashboard.statuses);
+      const initialStatuses = deriveMergedStatuses(dashboard, dashboard.statuses);
+      set({
+        dashboard: dashboardWithStatuses(dashboard, initialStatuses),
+        statuses: initialStatuses,
+      });
+      await Promise.all([requestAlertSync(run), requestCameraSync(run)]);
+      if (!isCurrentRun(run)) return;
+      const statuses = deriveMergedStatuses(dashboard, get().statuses);
       set({
         dashboard: dashboardWithStatuses(dashboard, statuses),
         loading: false,
         statuses,
-        connection: connectionAfterRestSuccess(),
+        connection: connectionAfterRestSuccess(run),
         lastUpdateAt: new Date().toISOString(),
       });
+      scheduleAlertReconciliation(run);
+      scheduleCameraRefresh(run);
+    }).catch(() => {
+      if (!isCurrentRun(run)) return;
+      set({ loading: false, connection: "RECONNECTING" });
+      scheduleAlertReconciliation(run);
+      scheduleCameraRefresh(run);
     });
-    pollTimer = setInterval(() => {
-      if (!isActiveFacility(facilityId)) return;
-      reconcileSnapshot(facilityId)
-        .then(() => refreshCameraFreshness(facilityId))
-        .then(() => {
-          if (!isActiveFacility(facilityId)) return;
-          set((state) => {
-            const statuses = deriveMergedStatuses(state.dashboard, state.statuses);
-            return {
-              dashboard: dashboardWithStatuses(state.dashboard, statuses),
-              statuses,
-              connection: connectionAfterRestSuccess(),
-              lastUpdateAt: new Date().toISOString(),
-            };
-          });
-        })
-        .catch(() => {
-          if (isActiveFacility(facilityId)) set({ connection: "RECONNECTING" });
-        });
-    }, intervalMs);
-    if (typeof EventSource === "undefined") return;
+
+    if (typeof EventSource === "undefined") {
+      scheduleFallback(run);
+      return;
+    }
     const eventSource = eventSourceFor(facilityId);
-    unsub = () => eventSource.close();
-    // SSE가 실제로 열려야만 실시간 채널이 살아 있다고 주장한다.
-    eventSource.onopen = () => {
-      if (!isActiveFacility(facilityId)) return;
-      sseHealthy = true;
+    run.eventSource = eventSource;
+    const markSseHealthy = () => {
+      if (!isCurrentRun(run)) return;
+      run.sseHealthy = true;
+      cancelFallback(run);
       set({ connection: "NORMAL" });
     };
-    const mergeAlertMessage = (event: MessageEvent) => {
-      if (!isActiveFacility(facilityId)) return;
-      // 프레임이 도착했다는 것 자체가 SSE 생존 증거다.
-      sseHealthy = true;
+    eventSource.onopen = markSseHealthy;
+    run.alertListener = ((event: MessageEvent) => {
+      if (!isCurrentRun(run)) return;
+      markSseHealthy();
       const alert = mapAlertDto(JSON.parse(event.data));
       alertMergeState = mergeAlerts(alertMergeState, [alert]);
       set((state) => {
@@ -250,11 +429,11 @@ export const useMonitorStore = create<MonitorState>((set, get) => ({
         };
       });
       recordDeliveries([alert], facilityId);
-    };
-    eventSource.addEventListener("alert", (event) => mergeAlertMessage(event as MessageEvent));
-    eventSource.addEventListener("alert-updated", (event) => {
-      if (!isActiveFacility(facilityId)) return;
-      const update = JSON.parse((event as MessageEvent).data) as AlertUpdateDelta;
+    }) as EventListener;
+    run.alertUpdatedListener = ((event: MessageEvent) => {
+      if (!isCurrentRun(run)) return;
+      markSseHealthy();
+      const update = JSON.parse(event.data) as AlertUpdateDelta;
       alertMergeState = mergeAlertUpdates(alertMergeState, [update]);
       set((state) => {
         const statuses = deriveMergedStatuses(state.dashboard, state.statuses);
@@ -265,84 +444,75 @@ export const useMonitorStore = create<MonitorState>((set, get) => ({
           lastUpdateAt: update.resolvedAt ?? new Date().toISOString(),
         };
       });
-    });
+    }) as EventListener;
+    eventSource.addEventListener("alert", run.alertListener);
+    eventSource.addEventListener("alert-updated", run.alertUpdatedListener);
     eventSource.onerror = () => {
-      if (!isActiveFacility(facilityId)) return;
-      sseHealthy = false;
+      if (!isCurrentRun(run)) return;
+      run.sseHealthy = false;
       set({ connection: "RECONNECTING" });
-      reconcileSnapshot(facilityId)
-        .then(() => {
-          if (!isActiveFacility(facilityId)) return;
-          set((state) => {
-            const statuses = deriveMergedStatuses(state.dashboard, state.statuses);
-            return {
-              dashboard: dashboardWithStatuses(state.dashboard, statuses),
-              statuses,
-              connection: connectionAfterRestSuccess(),
-              lastUpdateAt: new Date().toISOString(),
-            };
-          });
-        })
-        .catch(() => {
-          if (isActiveFacility(facilityId)) set({ connection: "RECONNECTING" });
-        });
+      scheduleFallback(run);
     };
-    eventSource.addEventListener("session-invalid", () => {
-      closeLiveConnection();
+    run.sessionInvalidListener = (() => {
+      if (!isCurrentRun(run)) return;
+      teardownRun(run);
       alertMergeState = createAlertMergeState();
       activeFacilityId = null;
       useAuthStore.getState().logout().catch(() => {
         useAuthStore.setState({ user: null });
       });
       set({ connection: "DISCONNECTED", running: false, loading: false });
-    });
+    }) as EventListener;
+    eventSource.addEventListener("session-invalid", run.sessionInvalidListener);
   },
 
   reload: async () => {
-    const facilityId = activeFacilityId;
-    if (!facilityId) {
+    const run = currentRun;
+    if (!run || !isCurrentRun(run)) {
       useMonitorStore.setState({ dashboard: null, loading: false, statuses: {} });
       return;
     }
     useMonitorStore.setState({ loading: true });
-    const dashboard = await dashboardService.getDashboard(facilityId);
-    if (!isActiveFacility(facilityId)) return;
+    const dashboard = await dashboardService.getDashboard(run.facilityId);
+    if (!isCurrentRun(run)) return;
     alertMergeState = createAlertMergeState(dashboard.unacknowledgedEvents as FrontendAlert[]);
-    recordDeliveries(dashboard.unacknowledgedEvents as FrontendAlert[], facilityId);
-    await reconcileSnapshot(facilityId);
-    if (!isActiveFacility(facilityId)) return;
-    const statuses = deriveMergedStatuses(dashboard, dashboard.statuses);
+    recordDeliveries(dashboard.unacknowledgedEvents as FrontendAlert[], run.facilityId);
+    const initialStatuses = deriveMergedStatuses(dashboard, dashboard.statuses);
+    useMonitorStore.setState({ dashboard: dashboardWithStatuses(dashboard, initialStatuses), statuses: initialStatuses });
+    await Promise.all([requestAlertSync(run), requestCameraSync(run)]);
+    if (!isCurrentRun(run)) return;
+    const statuses = deriveMergedStatuses(dashboard, useMonitorStore.getState().statuses);
     useMonitorStore.setState({
       dashboard: dashboardWithStatuses(dashboard, statuses),
       statuses,
       loading: false,
-      connection: connectionAfterRestSuccess(),
+      connection: connectionAfterRestSuccess(run),
       lastUpdateAt: new Date().toISOString(),
     });
   },
 
   stop: () => {
-    closeLiveConnection();
+    if (currentRun) teardownRun(currentRun);
     alertMergeState = createAlertMergeState();
     activeFacilityId = null;
+    freshnessBySpace = {};
     set({ running: false, dashboard: null, loading: false, statuses: {} });
   },
 
   resolve: async (spaceId) => {
-    // 활성 시설을 캡처하고 절대 resurrect하지 않는다. stop/전환 이후엔 조용히 드롭한다.
-    const facilityId = activeFacilityId;
-    if (!facilityId) return;
+    const run = currentRun;
+    if (!run || !isCurrentRun(run)) return;
     const alerts = await fetchActiveAlertSnapshot();
-    if (!isActiveFacility(facilityId)) return;
+    if (!isCurrentRun(run)) return;
     const alert = alerts
       .filter(
-        (item) => item.spaceId === spaceId && item.facilityId === facilityId && isActiveAlert(item),
+        (item) => item.spaceId === spaceId && item.facilityId === run.facilityId && isActiveAlert(item),
       )
       .sort((a, b) => +new Date(b.detectedAt) - +new Date(a.detectedAt))[0];
     if (!alert) return;
-    alertMergeState = mergeAlerts(alertMergeState, alerts.filter((item) => item.facilityId === facilityId));
+    alertMergeState = mergeAlerts(alertMergeState, alerts.filter((item) => item.facilityId === run.facilityId));
     const resolved = await resolveAlert(alert.id);
-    if (!isActiveFacility(facilityId)) return;
+    if (!isCurrentRun(run)) return;
     alertMergeState = mergeAlerts(alertMergeState, [resolved]);
     set((state) => {
       const statuses = deriveMergedStatuses(state.dashboard, state.statuses);

@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { renderHook, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { renderHook } from "@testing-library/react";
 import type { DashboardResponse, Space, SpaceStatus } from "@/types";
 const SCOPED_FACILITY_ID = "fac_happy_nokyang";
 const activeSpace: Space = {
@@ -146,6 +146,25 @@ function deferred<T>() {
   return { promise, resolve };
 }
 
+function storeSignal<T>(
+  store: { getState: () => T; subscribe: (listener: (state: T) => void) => () => void },
+  predicate: (state: T) => boolean,
+): Promise<void> {
+  if (predicate(store.getState())) return Promise.resolve();
+  return new Promise<void>((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      unsubscribe();
+      reject(new Error("Timed out awaiting monitor store state"));
+    }, 1_000);
+    const unsubscribe = store.subscribe((state) => {
+      if (!predicate(state)) return;
+      clearTimeout(timeout);
+      unsubscribe();
+      resolve();
+    });
+  });
+}
+
 function dashboardFor(
   facilityId: string,
   statuses: Record<string, SpaceStatus> = {},
@@ -270,11 +289,13 @@ describe("monitorStore live alert merge", () => {
     vi.stubGlobal("fetch", dashboardFetch());
 
     const { useMonitorStore } = await import("./monitorStore");
+    const facilityBReady = storeSignal(
+      useMonitorStore,
+      (state) => state.dashboard?.facility.id === "facility-b",
+    );
     useMonitorStore.getState().start("facility-a", 60_000);
     useMonitorStore.getState().start("facility-b", 60_000);
-    for (let i = 0; i < 30 && !useMonitorStore.getState().dashboard; i += 1) {
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    }
+    await facilityBReady;
     expect(useMonitorStore.getState().dashboard?.facility.id).toBe("facility-b");
     expect(useMonitorStore.getState().statuses).toEqual({});
 
@@ -292,10 +313,9 @@ describe("monitorStore live alert merge", () => {
     vi.stubGlobal("fetch", dashboardFetch());
 
     const { useMonitorStore } = await import("./monitorStore");
+    const dashboardReady = storeSignal(useMonitorStore, (state) => state.dashboard !== null);
     useMonitorStore.getState().start(SCOPED_FACILITY_ID, 60_000);
-    for (let i = 0; i < 30 && !useMonitorStore.getState().dashboard; i += 1) {
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    }
+    await dashboardReady;
 
     sendMessage(newerAlertDto);
     sendMessage(olderResolvedAlertDto);
@@ -324,10 +344,9 @@ describe("monitorStore live alert merge", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     const { useMonitorStore } = await import("./monitorStore");
+    const dashboardReady = storeSignal(useMonitorStore, (state) => state.dashboard !== null);
     useMonitorStore.getState().start(SCOPED_FACILITY_ID, 60_000);
-    for (let i = 0; i < 30 && !useMonitorStore.getState().dashboard; i += 1) {
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    }
+    await dashboardReady;
     useMonitorStore.setState({ statuses: { sp_201: dangerStatus } });
 
     await useMonitorStore.getState().resolve("sp_201");
@@ -354,10 +373,9 @@ describe("monitorStore live alert merge", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     const { useMonitorStore } = await import("./monitorStore");
+    const dashboardReady = storeSignal(useMonitorStore, (state) => state.dashboard !== null);
     useMonitorStore.getState().start(SCOPED_FACILITY_ID, 60_000);
-    for (let i = 0; i < 30 && !useMonitorStore.getState().dashboard; i += 1) {
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    }
+    await dashboardReady;
     useMonitorStore.setState({ statuses: { sp_201: dangerStatus } });
 
     await useMonitorStore.getState().resolve("sp_201");
@@ -379,10 +397,9 @@ describe("monitorStore live alert merge", () => {
     vi.stubGlobal("fetch", dashboardFetch());
 
     const { useMonitorStore } = await import("./monitorStore");
+    const dashboardReady = storeSignal(useMonitorStore, (state) => state.dashboard !== null);
     useMonitorStore.getState().start(SCOPED_FACILITY_ID, 60_000);
-    for (let i = 0; i < 30 && !useMonitorStore.getState().dashboard; i += 1) {
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    }
+    await dashboardReady;
 
     sendMessage(alertDtoWith({ id: "alert_seq_10", alertSeq: "10", detectedAt: "2026-06-22T01:10:00.000Z" }));
     sendMessage(alertDtoWith({ id: "alert_seq_2", alertSeq: "2", detectedAt: "2026-06-22T01:02:00.000Z" }));
@@ -396,10 +413,9 @@ describe("monitorStore live alert merge", () => {
     vi.stubGlobal("fetch", dashboardFetch());
 
     const { useMonitorStore } = await import("./monitorStore");
+    const dashboardReady = storeSignal(useMonitorStore, (state) => state.dashboard !== null);
     useMonitorStore.getState().start(SCOPED_FACILITY_ID, 60_000);
-    for (let i = 0; i < 30 && !useMonitorStore.getState().dashboard; i += 1) {
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    }
+    await dashboardReady;
 
     expect(useMonitorStore.getState().dashboard?.summary.danger).toBe(0);
 
@@ -420,9 +436,11 @@ describe("monitorStore live alert merge", () => {
       backendEventId: "event_receipt",
       alertSeq: "88",
     };
+    const deliveryRequested = deferred<void>();
     const fetchMock = vi.fn<typeof fetch>(async (input, init) => {
       const url = String(input);
       if (url.endsWith("/dashboard/receipts/delivery") && init?.method === "POST") {
+        deliveryRequested.resolve(undefined);
         return new Response(
           JSON.stringify({
             deliveryId: "delivery-88",
@@ -443,21 +461,19 @@ describe("monitorStore live alert merge", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     const { useMonitorStore } = await import("./monitorStore");
+    const dashboardReady = storeSignal(useMonitorStore, (state) => state.dashboard !== null);
     useMonitorStore.getState().start(SCOPED_FACILITY_ID, 60_000);
-    for (let i = 0; i < 30 && !useMonitorStore.getState().dashboard; i += 1) {
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    }
+    await dashboardReady;
 
     sendMessage(correlatedAlert);
 
-    await waitFor(() =>
-      expect(fetchMock).toHaveBeenCalledWith(
-        "/api/v1/dashboard/receipts/delivery",
-        expect.objectContaining({
-          method: "POST",
-          body: expect.stringContaining('"backendEventId":"event_receipt"'),
-        }),
-      ),
+    await deliveryRequested.promise;
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/v1/dashboard/receipts/delivery",
+      expect.objectContaining({
+        method: "POST",
+        body: expect.stringContaining('"backendEventId":"event_receipt"'),
+      }),
     );
     expect(
       useMonitorStore.getState().dashboard?.unacknowledgedEvents,
@@ -479,10 +495,9 @@ describe("monitorStore live alert merge", () => {
     vi.stubGlobal("fetch", dashboardFetch([alertDto, inactiveAlert], [activeSpace, inactiveSpace]));
 
     const { useMonitorStore } = await import("./monitorStore");
+    const dashboardReady = storeSignal(useMonitorStore, (state) => state.dashboard !== null);
     useMonitorStore.getState().start(SCOPED_FACILITY_ID, 60_000);
-    for (let i = 0; i < 30 && !useMonitorStore.getState().dashboard; i += 1) {
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    }
+    await dashboardReady;
 
     expect(useMonitorStore.getState().statuses).toMatchObject({ sp_201: { status: "DANGER" } });
     expect(useMonitorStore.getState().statuses).not.toHaveProperty(inactiveSpace.id);
@@ -514,10 +529,9 @@ describe("monitorStore resolve", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     const { useMonitorStore } = await import("./monitorStore");
+    const dashboardReady = storeSignal(useMonitorStore, (state) => state.dashboard !== null);
     useMonitorStore.getState().start(SCOPED_FACILITY_ID, 60_000);
-    for (let i = 0; i < 30 && !useMonitorStore.getState().dashboard; i += 1) {
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    }
+    await dashboardReady;
     useMonitorStore.setState({ statuses: { sp_201: dangerStatus } });
 
     await useMonitorStore.getState().resolve("sp_201");
@@ -564,23 +578,23 @@ describe("sse-independent — REST 성공이 SSE 장애를 덮지 않는다", ()
   }
 
   it("SSE가 끊긴 뒤 REST 폴링이 성공해도 connection이 NORMAL로 돌아가지 않는다", async () => {
+    vi.useFakeTimers();
+    vi.spyOn(Math, "random").mockReturnValue(0);
     vi.stubGlobal("fetch", dashboardFetch([], [activeSpace], [staleCameraDto]));
     const sse = stubEventSourceWithHandles();
 
     const { useMonitorStore } = await import("./monitorStore");
     useMonitorStore.getState().start(SCOPED_FACILITY_ID, 10);
     sse.onopen?.();
-    await waitFor(() => expect(useMonitorStore.getState().connection).toBe("NORMAL"));
+    expect(useMonitorStore.getState().connection).toBe("NORMAL");
 
-    // SSE 단절. 이 시점부터 REST는 계속 200을 준다.
     sse.onerror?.();
-
-    await waitFor(() => expect(useMonitorStore.getState().connection).toBe("RECONNECTING"));
-    // REST 폴링이 여러 번 성공해도 여전히 RECONNECTING이어야 한다.
-    await new Promise((resolve) => setTimeout(resolve, 40));
+    expect(useMonitorStore.getState().connection).toBe("RECONNECTING");
+    await vi.advanceTimersByTimeAsync(3_150);
     expect(useMonitorStore.getState().connection).toBe("RECONNECTING");
 
     useMonitorStore.getState().stop();
+    vi.useRealTimers();
   });
 
   it("SSE가 열리기 전에는 REST 성공만으로 NORMAL을 주장하지 않는다", async () => {
@@ -588,8 +602,9 @@ describe("sse-independent — REST 성공이 SSE 장애를 덮지 않는다", ()
     stubEventSourceWithHandles();
 
     const { useMonitorStore } = await import("./monitorStore");
+    const statusReady = storeSignal(useMonitorStore, (state) => state.statuses.sp_201 !== undefined);
     useMonitorStore.getState().start(SCOPED_FACILITY_ID, 10);
-    await waitFor(() => expect(useMonitorStore.getState().statuses.sp_201).toBeDefined());
+    await statusReady;
     expect(useMonitorStore.getState().connection).toBe("RECONNECTING");
 
     useMonitorStore.getState().stop();
@@ -602,8 +617,12 @@ describe("camera freshness — 죽은 카메라를 정상으로 표시하지 않
     vi.stubGlobal("EventSource", undefined);
 
     const { useMonitorStore } = await import("./monitorStore");
+    const statusReady = storeSignal(
+      useMonitorStore,
+      (state) => state.statuses.sp_201?.lastSeenAt === staleCameraDto.lastSeenAt,
+    );
     useMonitorStore.getState().start(SCOPED_FACILITY_ID, 10_000);
-    await waitFor(() => expect(useMonitorStore.getState().statuses.sp_201).toBeDefined());
+    await statusReady;
 
     const status = useMonitorStore.getState().statuses.sp_201;
     expect(status.connection).toBe("STALE");
@@ -620,12 +639,367 @@ describe("camera freshness — 죽은 카메라를 정상으로 표시하지 않
     vi.stubGlobal("EventSource", undefined);
 
     const { useMonitorStore } = await import("./monitorStore");
+    const statusReady = storeSignal(
+      useMonitorStore,
+      (state) => state.statuses.sp_201?.lastSeenAt === liveCamera.lastSeenAt,
+    );
     useMonitorStore.getState().start(SCOPED_FACILITY_ID, 10_000);
-    await waitFor(() => expect(useMonitorStore.getState().statuses.sp_201).toBeDefined());
+    await statusReady;
 
     expect(useMonitorStore.getState().statuses.sp_201.connection).toBe("LIVE");
 
     useMonitorStore.getState().stop();
+  });
+});
+
+describe("monitorStore deterministic supervisors", () => {
+  type SyntheticSource = {
+    onopen: (() => void) | null;
+    onerror: (() => void) | null;
+    close: ReturnType<typeof vi.fn>;
+    addEventListener: ReturnType<typeof vi.fn>;
+    removeEventListener: ReturnType<typeof vi.fn>;
+    emit: (type: string, data?: unknown) => void;
+    listenerCount: () => number;
+  };
+
+  function installSyntheticEventSource(): SyntheticSource[] {
+    const sources: SyntheticSource[] = [];
+    vi.stubGlobal(
+      "EventSource",
+      vi.fn().mockImplementation(() => {
+        const listeners = new Map<string, Set<(event: Event) => void>>();
+        const source: SyntheticSource = {
+          onopen: null,
+          onerror: null,
+          close: vi.fn(),
+          addEventListener: vi.fn((type: string, handler: (event: Event) => void) => {
+            const handlers = listeners.get(type) ?? new Set();
+            handlers.add(handler);
+            listeners.set(type, handlers);
+          }),
+          removeEventListener: vi.fn((type: string, handler: (event: Event) => void) => {
+            listeners.get(type)?.delete(handler);
+          }),
+          emit: (type, data) => {
+            const event = data === undefined
+              ? new Event(type)
+              : new MessageEvent(type, { data: JSON.stringify(data) });
+            for (const handler of listeners.get(type) ?? []) handler(event);
+          },
+          listenerCount: () =>
+            [...listeners.values()].reduce((count, handlers) => count + handlers.size, 0),
+        };
+        sources.push(source);
+        return source;
+      }),
+    );
+    return sources;
+  }
+
+  function countRequests(fetchMock: ReturnType<typeof dashboardFetch>, suffix: string): number {
+    return fetchMock.mock.calls.filter(([input]) => String(input).endsWith(suffix)).length;
+  }
+
+  beforeEach(() => {
+    vi.resetModules();
+    vi.unstubAllGlobals();
+    vi.useFakeTimers();
+    vi.setSystemTime(Date.parse("2026-08-12T00:00:00.000Z"));
+    vi.spyOn(Math, "random").mockReturnValue(0);
+  });
+
+  afterEach(() => {
+    vi.clearAllTimers();
+    vi.useRealTimers();
+  });
+
+  it("polls alerts at 3s only after SSE failure and cancels fallback on reconnect", async () => {
+    const sources = installSyntheticEventSource();
+    const fetchMock = dashboardFetch();
+    vi.stubGlobal("fetch", fetchMock);
+    const { useMonitorStore } = await import("./monitorStore");
+
+    useMonitorStore.getState().start(SCOPED_FACILITY_ID);
+    await vi.advanceTimersByTimeAsync(0);
+    sources[0].onopen?.();
+    const initialAlerts = countRequests(fetchMock, "/alerts?status=NEW");
+
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(countRequests(fetchMock, "/alerts?status=NEW")).toBe(initialAlerts);
+
+    sources[0].onerror?.();
+    await vi.advanceTimersByTimeAsync(3_149);
+    expect(countRequests(fetchMock, "/alerts?status=NEW")).toBe(initialAlerts);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(countRequests(fetchMock, "/alerts?status=NEW")).toBe(initialAlerts + 1);
+    await vi.advanceTimersByTimeAsync(3_150);
+    expect(countRequests(fetchMock, "/alerts?status=NEW")).toBe(initialAlerts + 2);
+
+    sources[0].onopen?.();
+    await vi.advanceTimersByTimeAsync(3_150);
+    expect(countRequests(fetchMock, "/alerts?status=NEW")).toBe(initialAlerts + 2);
+
+    useMonitorStore.getState().stop();
+    vi.useRealTimers();
+  });
+
+  it("refreshes cameras at 30s and reconciles alerts at 60s on independent jittered schedules", async () => {
+    const sources = installSyntheticEventSource();
+    const fetchMock = dashboardFetch();
+    vi.stubGlobal("fetch", fetchMock);
+    const { useMonitorStore } = await import("./monitorStore");
+
+    useMonitorStore.getState().start(SCOPED_FACILITY_ID);
+    await vi.advanceTimersByTimeAsync(0);
+    sources[0].onopen?.();
+    const initialAlerts = countRequests(fetchMock, "/alerts?status=NEW");
+    const initialCameras = countRequests(fetchMock, "/cameras");
+
+    await vi.advanceTimersByTimeAsync(31_499);
+    expect(countRequests(fetchMock, "/cameras")).toBe(initialCameras);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(countRequests(fetchMock, "/cameras")).toBe(initialCameras + 1);
+    expect(countRequests(fetchMock, "/alerts?status=NEW")).toBe(initialAlerts);
+
+    await vi.advanceTimersByTimeAsync(31_500);
+    expect(countRequests(fetchMock, "/cameras")).toBe(initialCameras + 2);
+    expect(countRequests(fetchMock, "/alerts?status=NEW")).toBe(initialAlerts + 1);
+
+    useMonitorStore.getState().stop();
+    vi.useRealTimers();
+  });
+
+  it("applies the upper 10% additive jitter bound when randomness is pinned", async () => {
+    vi.spyOn(Math, "random").mockReturnValue(1);
+    const sources = installSyntheticEventSource();
+    const fetchMock = dashboardFetch();
+    vi.stubGlobal("fetch", fetchMock);
+    const { useMonitorStore } = await import("./monitorStore");
+
+    useMonitorStore.getState().start(SCOPED_FACILITY_ID);
+    await vi.advanceTimersByTimeAsync(0);
+    sources[0].onopen?.();
+    const initialAlerts = countRequests(fetchMock, "/alerts?status=NEW");
+    const initialCameras = countRequests(fetchMock, "/cameras");
+
+    await vi.advanceTimersByTimeAsync(32_999);
+    expect(countRequests(fetchMock, "/cameras")).toBe(initialCameras);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(countRequests(fetchMock, "/cameras")).toBe(initialCameras + 1);
+    await vi.advanceTimersByTimeAsync(32_999);
+    expect(countRequests(fetchMock, "/alerts?status=NEW")).toBe(initialAlerts);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(countRequests(fetchMock, "/alerts?status=NEW")).toBe(initialAlerts + 1);
+
+    useMonitorStore.getState().stop();
+  });
+
+  it("repairs an SSE-missed alert from the 60s reconciliation snapshot", async () => {
+    const sources = installSyntheticEventSource();
+    let activeSnapshot = false;
+    const baseFetch = dashboardFetch();
+    const fetchMock = vi.fn<typeof fetch>((input, init) => {
+      if (String(input).endsWith("/alerts?status=NEW")) {
+        return Promise.resolve(okJsonResponse(activeSnapshot ? [alertDto] : []));
+      }
+      return baseFetch(input, init);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { useMonitorStore } = await import("./monitorStore");
+
+    useMonitorStore.getState().start(SCOPED_FACILITY_ID);
+    await vi.advanceTimersByTimeAsync(0);
+    sources[0].onopen?.();
+    expect(useMonitorStore.getState().statuses.sp_201.status).toBe("STABLE");
+
+    activeSnapshot = true;
+    await vi.advanceTimersByTimeAsync(63_000);
+    expect(useMonitorStore.getState().statuses.sp_201.status).toBe("DANGER");
+
+    useMonitorStore.getState().stop();
+    vi.useRealTimers();
+  });
+
+  it("runs one immediate coalesced sync when the page becomes visible or the browser comes online", async () => {
+    const sources = installSyntheticEventSource();
+    const fetchMock = dashboardFetch();
+    vi.stubGlobal("fetch", fetchMock);
+    const { useMonitorStore } = await import("./monitorStore");
+
+    useMonitorStore.getState().start(SCOPED_FACILITY_ID);
+    await vi.advanceTimersByTimeAsync(0);
+    sources[0].onopen?.();
+    const initialAlerts = countRequests(fetchMock, "/alerts?status=NEW");
+    const initialCameras = countRequests(fetchMock, "/cameras");
+
+    Object.defineProperty(document, "visibilityState", { configurable: true, value: "hidden" });
+    document.dispatchEvent(new Event("visibilitychange"));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(countRequests(fetchMock, "/alerts?status=NEW")).toBe(initialAlerts);
+
+    Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" });
+    document.dispatchEvent(new Event("visibilitychange"));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(countRequests(fetchMock, "/alerts?status=NEW")).toBe(initialAlerts + 1);
+    expect(countRequests(fetchMock, "/cameras")).toBe(initialCameras + 1);
+
+    window.dispatchEvent(new Event("online"));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(countRequests(fetchMock, "/alerts?status=NEW")).toBe(initialAlerts + 2);
+    expect(countRequests(fetchMock, "/cameras")).toBe(initialCameras + 2);
+
+    useMonitorStore.getState().stop();
+    vi.useRealTimers();
+  });
+
+  it("coalesces repeated alert sync triggers without overlapping requests", async () => {
+    const sources = installSyntheticEventSource();
+    const heldSnapshot = deferred<Response>();
+    let activeSnapshotCalls = 0;
+    const baseFetch = dashboardFetch();
+    const fetchMock = vi.fn<typeof fetch>((input, init) => {
+      if (String(input).endsWith("/alerts?status=NEW")) {
+        activeSnapshotCalls += 1;
+        if (activeSnapshotCalls === 2) return heldSnapshot.promise;
+      }
+      return baseFetch(input, init);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { useMonitorStore } = await import("./monitorStore");
+
+    useMonitorStore.getState().start(SCOPED_FACILITY_ID);
+    await vi.advanceTimersByTimeAsync(0);
+    sources[0].onopen?.();
+    await vi.advanceTimersByTimeAsync(63_000);
+    expect(activeSnapshotCalls).toBe(2);
+
+    window.dispatchEvent(new Event("online"));
+    window.dispatchEvent(new Event("online"));
+    expect(activeSnapshotCalls).toBe(2);
+
+    heldSnapshot.resolve(okJsonResponse([]));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(activeSnapshotCalls).toBe(3);
+
+    useMonitorStore.getState().stop();
+    vi.useRealTimers();
+  });
+
+  it("rejects writes from a stopped generation even after restarting the same facility", async () => {
+    const sources = installSyntheticEventSource();
+    const heldSnapshot = deferred<Response>();
+    let activeSnapshotCalls = 0;
+    const baseFetch = dashboardFetch();
+    const fetchMock = vi.fn<typeof fetch>((input, init) => {
+      if (String(input).endsWith("/alerts?status=NEW")) {
+        activeSnapshotCalls += 1;
+        if (activeSnapshotCalls === 2) return heldSnapshot.promise;
+      }
+      return baseFetch(input, init);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { useMonitorStore } = await import("./monitorStore");
+
+    useMonitorStore.getState().start(SCOPED_FACILITY_ID);
+    await vi.advanceTimersByTimeAsync(0);
+    sources[0].onopen?.();
+    await vi.advanceTimersByTimeAsync(63_000);
+    expect(activeSnapshotCalls).toBe(2);
+
+    useMonitorStore.getState().stop();
+    useMonitorStore.getState().start(SCOPED_FACILITY_ID);
+    await vi.advanceTimersByTimeAsync(0);
+    sources[1].onopen?.();
+    expect(useMonitorStore.getState().statuses.sp_201.status).toBe("STABLE");
+
+    heldSnapshot.resolve(okJsonResponse([alertDto]));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(useMonitorStore.getState().statuses.sp_201.status).toBe("STABLE");
+
+    useMonitorStore.getState().stop();
+    vi.useRealTimers();
+  });
+
+  it("runs exactly one initial alert and camera sync for each facility switch", async () => {
+    const sources = installSyntheticEventSource();
+    const fetchMock = dashboardFetch();
+    vi.stubGlobal("fetch", fetchMock);
+    const { useMonitorStore } = await import("./monitorStore");
+
+    useMonitorStore.getState().start("facility-a");
+    await vi.advanceTimersByTimeAsync(0);
+    sources[0].onopen?.();
+    expect(countRequests(fetchMock, "/alerts?status=NEW")).toBe(1);
+    expect(countRequests(fetchMock, "/cameras")).toBe(1);
+
+    useMonitorStore.getState().start("facility-b");
+    await vi.advanceTimersByTimeAsync(0);
+    sources[1].onopen?.();
+    expect(countRequests(fetchMock, "/alerts?status=NEW")).toBe(2);
+    expect(countRequests(fetchMock, "/cameras")).toBe(2);
+    expect(sources[0].close).toHaveBeenCalledTimes(1);
+
+    useMonitorStore.getState().stop();
+  });
+
+  it("completion-schedules camera refresh and coalesces triggers while its request is in flight", async () => {
+    const sources = installSyntheticEventSource();
+    const heldCameras = deferred<Response>();
+    let cameraCalls = 0;
+    const baseFetch = dashboardFetch();
+    const fetchMock = vi.fn<typeof fetch>((input, init) => {
+      if (String(input).endsWith("/cameras")) {
+        cameraCalls += 1;
+        if (cameraCalls === 2) return heldCameras.promise;
+      }
+      return baseFetch(input, init);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { useMonitorStore } = await import("./monitorStore");
+
+    useMonitorStore.getState().start(SCOPED_FACILITY_ID);
+    await vi.advanceTimersByTimeAsync(0);
+    sources[0].onopen?.();
+    await vi.advanceTimersByTimeAsync(31_500);
+    expect(cameraCalls).toBe(2);
+
+    window.dispatchEvent(new Event("online"));
+    window.dispatchEvent(new Event("online"));
+    await vi.advanceTimersByTimeAsync(120_000);
+    expect(cameraCalls).toBe(2);
+
+    heldCameras.resolve(okJsonResponse([]));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(cameraCalls).toBe(3);
+    await vi.advanceTimersByTimeAsync(31_499);
+    expect(cameraCalls).toBe(3);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(cameraCalls).toBe(4);
+
+    useMonitorStore.getState().stop();
+  });
+
+  it("tears down every timer, listener, and EventSource", async () => {
+    const sources = installSyntheticEventSource();
+    vi.stubGlobal("fetch", dashboardFetch());
+    const removeDocumentListener = vi.spyOn(document, "removeEventListener");
+    const removeWindowListener = vi.spyOn(window, "removeEventListener");
+    const { useMonitorStore } = await import("./monitorStore");
+
+    useMonitorStore.getState().start(SCOPED_FACILITY_ID);
+    await vi.advanceTimersByTimeAsync(0);
+    sources[0].onopen?.();
+    expect(vi.getTimerCount()).toBeGreaterThan(0);
+
+    useMonitorStore.getState().stop();
+    expect(vi.getTimerCount()).toBe(0);
+    expect(sources[0].close).toHaveBeenCalledTimes(1);
+    expect(sources[0].listenerCount()).toBe(0);
+    expect(removeDocumentListener).toHaveBeenCalledWith("visibilitychange", expect.any(Function));
+    expect(removeWindowListener).toHaveBeenCalledWith("online", expect.any(Function));
+
+    vi.useRealTimers();
   });
 });
 
@@ -650,9 +1024,14 @@ describe("stale-boundary — 3분 경계가 스토어까지 반영된다", () =>
     vi.stubGlobal("fetch", dashboardFetch([], [activeSpace], [cameraSeenMsAgo(180_000)]));
     vi.stubGlobal("EventSource", undefined);
     const { useMonitorStore } = await import("./monitorStore");
+    const expectedLastSeenAt = cameraSeenMsAgo(180_000).lastSeenAt;
+    const statusReady = storeSignal(
+      useMonitorStore,
+      (state) => state.statuses.sp_201?.lastSeenAt === expectedLastSeenAt,
+    );
 
     useMonitorStore.getState().start(SCOPED_FACILITY_ID, 10_000);
-    await waitFor(() => expect(useMonitorStore.getState().statuses.sp_201).toBeDefined());
+    await statusReady;
 
     expect(useMonitorStore.getState().statuses.sp_201.connection).toBe("LIVE");
     useMonitorStore.getState().stop();
@@ -663,9 +1042,14 @@ describe("stale-boundary — 3분 경계가 스토어까지 반영된다", () =>
     vi.stubGlobal("fetch", dashboardFetch([], [activeSpace], [cameraSeenMsAgo(181_000)]));
     vi.stubGlobal("EventSource", undefined);
     const { useMonitorStore } = await import("./monitorStore");
+    const expectedLastSeenAt = cameraSeenMsAgo(181_000).lastSeenAt;
+    const statusReady = storeSignal(
+      useMonitorStore,
+      (state) => state.statuses.sp_201?.lastSeenAt === expectedLastSeenAt,
+    );
 
     useMonitorStore.getState().start(SCOPED_FACILITY_ID, 10_000);
-    await waitFor(() => expect(useMonitorStore.getState().statuses.sp_201).toBeDefined());
+    await statusReady;
 
     expect(useMonitorStore.getState().statuses.sp_201.connection).toBe("STALE");
     useMonitorStore.getState().stop();

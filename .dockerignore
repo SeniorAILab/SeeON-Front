@@ -1,9 +1,0 @@
-node_modules
-dist
-.vite
-.next
-*.log
-.DS_Store
-coverage
-.env
-.env.*

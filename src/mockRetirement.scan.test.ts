@@ -7,13 +7,13 @@ const srcRoot = path.dirname(fileURLToPath(import.meta.url));
 const frontRoot = path.resolve(srcRoot, "..");
 const scriptsRoot = path.join(frontRoot, "scripts");
 const testFile = "src/mockRetirement.scan.test.ts";
-const repositoryRoot = path.resolve(frontRoot, "..");
+const repositoryRoot = frontRoot;
 const retirementGuardSurfaces = [
-  { relativePath: "front/AGENTS.md", allowDeletionNotes: true },
-  { relativePath: "front/src/AGENTS.md", allowDeletionNotes: true },
-  { relativePath: "front/README.md", allowDeletionNotes: true },
-  { relativePath: "front/package.json", allowDeletionNotes: false },
-  { relativePath: "front/.gitignore", allowDeletionNotes: false },
+  { relativePath: "AGENTS.md", allowDeletionNotes: true },
+  { relativePath: "src/AGENTS.md", allowDeletionNotes: true },
+  { relativePath: "README.md", allowDeletionNotes: true },
+  { relativePath: "package.json", allowDeletionNotes: false },
+  { relativePath: ".gitignore", allowDeletionNotes: false },
 ] as const;
 
 const removedFixtureFiles = new Set(

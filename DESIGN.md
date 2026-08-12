@@ -17,7 +17,7 @@ Senior AI Lab is a calm care-operations command center. The signature is Threads
 | Text/primary | `--c-ink` | `#0f0f0f` | `#f5f5f5` | Main text |
 | Text/secondary | `--c-ink-soft` | `#595959` | `#b3b3b3` | Labels and helper text |
 | Text/faint | `--c-ink-faint` | `#8a8a8a` | `#808080` | Metadata and low-priority help |
-| Brand/action (interactive-only) | `--c-brand` | `#2f6fb0` | `#4d97e0` | Primary actions, focus, links — never decorative |
+| Brand/action (interactive-only) | `--c-brand` | `#2f6fb0` | `#4d97e0` | Primary actions, focus, links. Never decorative |
 | Brand/soft | `--c-brand-soft` | `#eaf2fb` | `#1d2c40` | Subtle action background |
 | Teal/accent | `--c-teal` | `#2bb6a3` | `#3fd3bd` | Secondary accent |
 | Status/success | `--c-stable` | `#166e3d` | `#45d07f` | Stable state |
@@ -29,10 +29,12 @@ Senior AI Lab is a calm care-operations command center. The signature is Threads
 
 - Use token-backed Tailwind colors (`bg`, `surface`, `surface2`, `border`, `ink`, `brand`, `status`) before raw colors.
 - Surfaces, backgrounds, and text stay neutral (no navy or blue tint); status colors are the only chroma on those surfaces.
-- Brand blue is for actions, links, and focus states only — never background decoration.
+- Brand blue is for actions, links, and focus states only. Never background decoration.
 - Status colors must pair text with their matching background token where possible.
+- Implementation tokens live in `src/index.css`; Tailwind aliases live in `tailwind.config.js`.
+- Fixed-format operational elements stay dimensionally stable (buttons, room cards, counters, nav tabs must not resize on hover or idle state). Exception: floor-monitor room tiles may grid-span expand when a room enters danger or check-needed, so the at-risk room reads larger. That resize is span-only (never hover/idle) and must move via transform/scale only.
 
-See the repo-root `DESIGN.md` for the canonical palette rationale, contrast rules, and the monitor-tile dimensional-stability exception.
+This file is the design SSOT for the standalone frontend repository.
 
 ## 3. Typography
 

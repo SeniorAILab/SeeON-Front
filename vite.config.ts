@@ -3,16 +3,17 @@ import react from "@vitejs/plugin-react";
 import { loadEnv } from "vite";
 import path from "path";
 
+const REPO_ROOT = path.resolve(__dirname);
+const DEFAULT_DEV_BACKEND_ORIGIN = "http://localhost:8080";
+
 export default defineConfig(({ mode }) => {
-  const envDir = path.resolve(__dirname, "..");
-  const env = loadEnv(mode, envDir, "");
+  const env = loadEnv(mode, REPO_ROOT, "");
   const backendTarget =
-    env.VITE_DEV_BACKEND_ORIGIN ??
-    `http://localhost:${env.BACKEND_PORT ?? env.PORT ?? "8080"}`;
+    env.VITE_DEV_BACKEND_ORIGIN ?? DEFAULT_DEV_BACKEND_ORIGIN;
 
   return {
     plugins: [react()],
-    envDir,
+    envDir: REPO_ROOT,
     resolve: {
       alias: {
         "@": path.resolve(__dirname, "./src"),
@@ -23,7 +24,6 @@ export default defineConfig(({ mode }) => {
       strictPort: true,
       proxy: {
         "/api": backendTarget,
-        "/ingest": backendTarget,
       },
     },
     preview: {

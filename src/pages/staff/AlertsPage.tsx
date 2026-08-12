@@ -173,7 +173,7 @@ export function AlertsPage() {
             title="확인 필요"
             empty="확인할 새 알림이 없습니다."
             alerts={grouped.NEW}
-            renderMeta={(alert) => `${formatDateTime(alert.detectedAt)} · ${alert.room}`}
+            renderMeta={(alert) => alertMeta(alert, formatDateTime(alert.detectedAt))}
             pulseClassFor={(alert) => (pulsingIds.has(alert.id) ? "animate-pulse-alert-new motion-reduce:animate-none" : "")}
             renderAction={(alert) => (
               <button
@@ -181,7 +181,7 @@ export function AlertsPage() {
                 onClick={() => acknowledge(alert)}
                 className="min-h-[56px] rounded-xl bg-brand px-6 text-staff-btn text-white disabled:opacity-60"
               >
-                확인하러 갑니다
+                {alert.testMode === "SYSTEM_TEST" ? "테스트 확인" : "확인하러 갑니다"}
               </button>
             )}
           />
@@ -191,7 +191,7 @@ export function AlertsPage() {
             empty="확인된 알림이 없습니다."
             alerts={grouped.ACKED}
             renderMeta={(alert) =>
-              `${alert.ackedByName ?? "직원"} 확인 · ${formatDateTime(alert.ackedAt ?? alert.detectedAt)} · ${alert.room}`
+              alertMeta(alert, `${alert.ackedByName ?? "직원"} 확인 · ${formatDateTime(alert.ackedAt ?? alert.detectedAt)}`)
             }
             renderAction={(alert) => (
               <button
@@ -199,7 +199,7 @@ export function AlertsPage() {
                 onClick={() => resolve(alert)}
                 className="min-h-[56px] rounded-xl bg-status-stable px-6 text-staff-btn text-white disabled:opacity-60"
               >
-                현장 확인 완료
+                {alert.testMode === "SYSTEM_TEST" ? "테스트 종료" : "현장 확인 완료"}
               </button>
             )}
           />
@@ -209,9 +209,9 @@ export function AlertsPage() {
             empty="해결된 알림이 없습니다."
             alerts={grouped.RESOLVED}
             renderMeta={(alert) =>
-              `${alert.resolvedByName ?? "직원"} 해결 · ${formatDateTime(
+              alertMeta(alert, `${alert.resolvedByName ?? "직원"} 해결 · ${formatDateTime(
                 alert.resolvedAt ?? alert.detectedAt
-              )} · ${alert.room}`
+              )}`)
             }
             renderAction={(alert) => (
               <button
@@ -232,14 +232,14 @@ export function AlertsPage() {
                 ref={notesDialogRef}
                 role="dialog"
                 aria-modal="true"
-                aria-label={`${notesAlert.room} 메모 히스토리`}
+                aria-label={`${alertSubject(notesAlert)} 메모 히스토리`}
                 tabIndex={-1}
                 className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-3xl border border-border bg-surface p-5 shadow-modal"
                 onMouseDown={(event) => event.stopPropagation()}
                 onKeyDown={trapNotesFocus}
               >
                 <div className="flex items-center justify-between gap-3">
-                  <h2 className="text-staff-status text-ink">{notesAlert.room} 메모 히스토리</h2>
+                  <h2 className="text-staff-status text-ink">{alertSubject(notesAlert)} 메모 히스토리</h2>
                   <button
                     type="button"
                     onClick={closeNotes}
@@ -312,6 +312,11 @@ function AlertSection({
             return (
               <div
                 key={alert.id}
+                data-alert-id={alert.id}
+                data-backend-event-id={alert.backendEventId ?? undefined}
+                data-correlation-id={alert.backendEventId ?? alert.id}
+                data-test-mode={alert.testMode}
+                data-status={alert.testMode === "SYSTEM_TEST" ? "SYSTEM_TEST" : alert.status}
                 className={cn(
                   "flex flex-wrap items-center gap-4 rounded-2xl border border-border bg-surface p-5 shadow-card",
                   pulseClassFor?.(alert)
@@ -343,6 +348,14 @@ function AlertSection({
       )}
     </section>
   );
+}
+
+function alertSubject(alert: AlertView): string {
+  return alert.testMode === "SYSTEM_TEST" ? "SYSTEM TEST" : (alert.room ?? "알림");
+}
+
+function alertMeta(alert: AlertView, prefix: string): string {
+  return alert.testMode === "SYSTEM_TEST" ? prefix : `${prefix} · ${alert.room ?? "공간"}`;
 }
 
 function errorMessage(err: unknown): string {

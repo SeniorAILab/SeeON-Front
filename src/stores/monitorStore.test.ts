@@ -980,6 +980,57 @@ describe("monitorStore deterministic supervisors", () => {
     useMonitorStore.getState().stop();
   });
 
+  it("reconciles the same alert from SSE and polling fallback into one UI notification", async () => {
+    const sources = installSyntheticEventSource();
+    let snapshot: unknown[] = [];
+    const baseFetch = dashboardFetch();
+    const fetchMock = vi.fn<typeof fetch>((input, init) => {
+      if (String(input).endsWith("/alerts?status=NEW")) {
+        return Promise.resolve(okJsonResponse(snapshot));
+      }
+      return baseFetch(input, init);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { useMonitorStore } = await import("./monitorStore");
+
+    useMonitorStore.getState().start(SCOPED_FACILITY_ID);
+    await vi.advanceTimersByTimeAsync(0);
+    sources[0].onopen?.();
+    const sameAlert = alertDtoWith({ id: "alert-sse-poll", alertSeq: "90" });
+    sources[0].emit("alert", sameAlert);
+    snapshot = [sameAlert];
+    sources[0].onerror?.();
+    await vi.advanceTimersByTimeAsync(3_150);
+
+    expect(useMonitorStore.getState().dashboard?.unacknowledgedEvents.map((item) => item.id)).toEqual([
+      "alert-sse-poll",
+    ]);
+    useMonitorStore.getState().stop();
+  });
+
+  it("keeps reconnect replay single but preserves two distinct same-space alert IDs", async () => {
+    const sources = installSyntheticEventSource();
+    vi.stubGlobal("fetch", dashboardFetch());
+    const { useMonitorStore } = await import("./monitorStore");
+
+    useMonitorStore.getState().start(SCOPED_FACILITY_ID);
+    await vi.advanceTimersByTimeAsync(0);
+    sources[0].onopen?.();
+    const first = alertDtoWith({ id: "alert-reconnect-1", alertSeq: "91" });
+    const second = alertDtoWith({ id: "alert-reconnect-2", alertSeq: "92" });
+    sources[0].emit("alert", first);
+    sources[0].onerror?.();
+    sources[0].onopen?.();
+    sources[0].emit("alert", first);
+    sources[0].emit("alert", second);
+
+    expect(useMonitorStore.getState().dashboard?.unacknowledgedEvents.map((item) => item.id)).toEqual([
+      "alert-reconnect-2",
+      "alert-reconnect-1",
+    ]);
+    useMonitorStore.getState().stop();
+  });
+
   it("tears down every timer, listener, and EventSource", async () => {
     const sources = installSyntheticEventSource();
     vi.stubGlobal("fetch", dashboardFetch());

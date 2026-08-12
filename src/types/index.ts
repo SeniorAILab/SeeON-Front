@@ -55,7 +55,13 @@ export type AlertLifecycleStatus =
   | "ACKNOWLEDGED" // 직원 확인 완료
   | "FAILED"; // 발송 실패
 
+export const SYSTEM_TEST_MODE = "SYSTEM_TEST" as const;
+export const SYSTEM_TEST_LABEL = "SYSTEM TEST - NOT A RESIDENT ALERT" as const;
+export const SYSTEM_TEST_TTS_TEXT = "System test emergency notification" as const;
+export type SystemTestMode = typeof SYSTEM_TEST_MODE;
+
 export type DetectionEventType =
+  | "SYSTEM_TEST"
   | "STABLE"
   | "MOVEMENT_INCREASE"
   | "REPEATED_STANDING_ATTEMPT"
@@ -147,12 +153,15 @@ export interface DetectionEvent {
   id: string;
   backendEventId?: string | null;
   facilityId: string;
-  spaceId: string;
+  spaceId: string | null;
   alertSeq?: string; // backend causal sequence for dashboard-stream merge
   residentId?: string | null; // null = room/space-level alert
   cameraId?: string | null;
   room?: string;
   eventType: DetectionEventType;
+  testMode?: SystemTestMode;
+  label?: typeof SYSTEM_TEST_LABEL;
+  ttsText?: typeof SYSTEM_TEST_TTS_TEXT;
   riskLevel: Level;
   message: string;
   aiSummary: string;
@@ -247,10 +256,13 @@ export interface AlertView {
   facilityId: string;
   residentId: string | null;
   cameraId: string | null;
-  spaceId: string;
-  room: string;
+  spaceId: string | null;
+  room: string | null;
   type: string;
-  probability: number;
+  testMode?: SystemTestMode;
+  label?: typeof SYSTEM_TEST_LABEL;
+  ttsText?: typeof SYSTEM_TEST_TTS_TEXT;
+  probability: number | null;
   snapshotKey: string | null;
   detectedAt: string;
   status: AlertStatus;

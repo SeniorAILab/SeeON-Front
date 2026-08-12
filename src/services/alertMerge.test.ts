@@ -81,6 +81,45 @@ describe("alertMerge", () => {
     expect(state.highestSeqByFacility[SCOPED_FACILITY_ID]).toBe("1");
   });
 
+  it("reconciles SSE, REST polling, and replay once by alert identity while preserving distinct same-space events", () => {
+    const first = alert({ id: "alert-event-1", backendEventId: "event-1", alertSeq: "1" });
+    const second = alert({ id: "alert-event-2", backendEventId: "event-2", alertSeq: "2" });
+
+    let state = createAlertMergeState();
+    state = mergeAlerts(state, [first]);
+    state = reconcileActiveAlertSnapshot(state, SCOPED_FACILITY_ID, [first]);
+    state = mergeAlerts(state, [first]);
+    expect(alertsForFacility(state, SCOPED_FACILITY_ID).map((item) => item.id)).toEqual([first.id]);
+
+    state = mergeAlerts(state, [second]);
+    expect(alertsForFacility(state, SCOPED_FACILITY_ID).map((item) => item.id)).toEqual([second.id, first.id]);
+  });
+
+  it("keeps SYSTEM_TEST active and visible without deriving a room danger status", () => {
+    const system = alert({
+      id: "alert-system-merge",
+      backendEventId: "event-system-merge",
+      alertSeq: "3",
+      spaceId: null,
+      room: undefined,
+      cameraId: null,
+      eventType: "SYSTEM_TEST",
+      riskLevel: "LOW",
+      emergency: false,
+      backendType: "SYSTEM_TEST",
+      testMode: "SYSTEM_TEST",
+      label: "SYSTEM TEST - NOT A RESIDENT ALERT",
+      ttsText: "System test emergency notification",
+    } as unknown as Partial<FrontendAlert>);
+
+    const merged = mergeAlertsIntoDashboard(dashboard(), [system]);
+
+    expect(isActiveAlert(system)).toBe(true);
+    expect(merged.unacknowledgedEvents).toEqual([system]);
+    expect(merged.statuses).toEqual({});
+    expect(merged.summary).toMatchObject({ danger: 0, checkNeeded: 0, unacknowledged: 1 });
+  });
+
   it("test_alert_seq_comparison_is_numeric_not_lexicographic", () => {
     expect(compareAlertSeq("10", "9")).toBe(1);
     expect(compareAlertSeq("10", "2")).toBe(1);

@@ -4,6 +4,7 @@ import {
   Bed,
   Clock,
   Footprints,
+  FlaskConical,
   HelpCircle,
   PersonStanding,
   UserRound,
@@ -58,6 +59,7 @@ export const alertLabel: Record<AlertLifecycleStatus, string> = {
 };
 
 const eventTypeLabelRegistry: Record<DetectionEventType, string> = {
+  SYSTEM_TEST: "SYSTEM TEST",
   STABLE: "안정 상태",
   MOVEMENT_INCREASE: "움직임 증가",
   REPEATED_STANDING_ATTEMPT: "반복 기립 시도",
@@ -125,6 +127,12 @@ const UNKNOWN_EVENT_PRESENTATION: EventPresentation = {
  * 문자열을 키로 쓴다.
  */
 const eventPresentationRegistry: Record<string, EventPresentation> = {
+  SYSTEM_TEST: {
+    icon: FlaskConical,
+    title: "SYSTEM TEST",
+    severity: "medium",
+    phrase: "시스템 기능 점검 알림입니다",
+  },
   fall: {
     icon: AlertTriangle,
     title: "낙상 감지",

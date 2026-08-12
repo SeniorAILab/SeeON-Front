@@ -169,7 +169,7 @@ function deriveMergedStatuses(
     Object.entries(statuses).filter(([spaceId]) => activeSpaceIds.has(spaceId)),
   );
   const alerts = alertsForFacility(alertMergeState, activeFacilityId).filter((alert) =>
-    activeSpaceIds.has(alert.spaceId),
+    alert.spaceId !== null && activeSpaceIds.has(alert.spaceId),
   );
   return applyFreshness(deriveStatusesFromAlerts(activeStatuses, alerts));
 }

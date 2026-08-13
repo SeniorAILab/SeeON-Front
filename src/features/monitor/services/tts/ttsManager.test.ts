@@ -63,6 +63,24 @@ describe("TTSManager event identity", () => {
     vi.useRealTimers();
   });
 
+  it("retries an active due alert immediately from a user gesture when enabled", () => {
+    const manager = new TTSManager();
+
+    manager.update([incident("event-gesture-retry")], true);
+    manager.retryPendingOnUserGesture();
+
+    expect(playTTSMock).toHaveBeenCalledWith("101호에서 위험 발생, 확인이 필요합니다");
+  });
+
+  it("does not retry pending alerts from a user gesture when disabled", () => {
+    const manager = new TTSManager();
+
+    manager.update([incident("event-disabled-gesture-retry")], false);
+    manager.retryPendingOnUserGesture();
+
+    expect(playTTSMock).not.toHaveBeenCalled();
+  });
+
   it("does not speak the same event again after replay, removal, and reconnect", async () => {
     const manager = new TTSManager();
     const alert = incident("event-replay-1");

@@ -95,6 +95,10 @@ export class TTSManager {
         }
       } else if (PRIORITY[alert.level] < PRIORITY[current.level]) {
         this.items.set(alert.identity, { ...alert, announces: 0, nextAt: now });
+        // A stale queued (not yet drained) reannouncement utterance for this
+        // identity would otherwise block tick() from re-enqueueing it at the
+        // upgraded severity/text/first-announcement cohort.
+        this.queue = this.queue.filter((utterance) => utterance.identity !== alert.identity);
       } else {
         Object.assign(current, alert);
       }

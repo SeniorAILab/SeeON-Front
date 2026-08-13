@@ -187,4 +187,52 @@ describe("TTSManager first-announcement fairness", () => {
       text.emergency,
     ]);
   });
+
+  it("refreshes a stale queued reannouncement when its identity escalates while already queued", async () => {
+    const manager = new TTSManager();
+    const emergency = incident("event-emergency-queued-escalation", "space-1", "101호", "EMERGENCY");
+    const danger1 = incident("event-danger-1-queued-escalation", "space-2", "102호", "DANGER");
+    const danger2 = incident("event-danger-2-queued-escalation", "space-3", "103호", "DANGER");
+
+    manager.update([emergency, danger1, danger2], true);
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(spokenTexts()).toEqual([text.emergency, text.danger1, text.danger2]);
+
+    // All three become reannounce-eligible together at t=31s. Block the
+    // emergency's reannouncement mid-flight so danger1's reannouncement is
+    // pushed into `this.queue` but never drained.
+    const blocker = deferred<{ ok: true }>();
+    playTTSMock.mockReturnValueOnce(blocker.promise);
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(spokenTexts()).toHaveLength(4);
+    expect(spokenTexts()[3]).toBe(text.emergency);
+
+    // danger1 now escalates to EMERGENCY while its stale DANGER
+    // reannouncement utterance is still sitting, undrained, in the queue.
+    // A SYSTEM_TEST also arrives in the same update.
+    const escalatedDanger1 = incident("event-danger-1-queued-escalation", "space-2", "102호", "EMERGENCY");
+    manager.update(
+      [emergency, escalatedDanger1, danger2, systemTest("event-system-test-queued-escalation")],
+      true,
+    );
+    await vi.advanceTimersByTimeAsync(1_000);
+
+    // Let the blocked emergency reannouncement finish so the queue drains.
+    blocker.resolve({ ok: true });
+    await vi.advanceTimersByTimeAsync(0);
+
+    // Exactly one utterance for the escalated identity, refreshed to the new
+    // EMERGENCY text/priority and placed in the first-announcement cohort
+    // ahead of SYSTEM_TEST and the still-DANGER reannouncement.
+    expect(spokenTexts().slice(4)).toEqual([
+      "102호에서 응급 발생, 확인이 필요합니다",
+      text.systemTest,
+      text.danger2,
+    ]);
+    // text.danger1 was legitimately spoken once as the pre-escalation first
+    // announcement; the stale queued DANGER reannouncement must never speak.
+    expect(
+      spokenTexts().filter((spoken) => spoken === text.danger1).length,
+    ).toBe(1);
+  });
 });

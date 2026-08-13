@@ -1,5 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { StaffLayout } from "@/components/layout/StaffLayout";
 import { FloorMonitorPage } from "./FloorMonitorPage";
 import { useAuthStore } from "@/stores/authStore";
 import { useFacilityStore } from "@/stores/facilityStore";
@@ -200,12 +202,54 @@ describe("FloorMonitorPage — allView-keyed surface sizing", () => {
     expect(surface.className).not.toContain("-translate-x-1/2");
   });
 
+  it("places the actual StaffLayout Outlet root on the page-bleed grid track", async () => {
+    render(
+      <MemoryRouter initialEntries={["/facilities/fac_happy_nokyang/dashboard"]}>
+        <Routes>
+          <Route path="/facilities/:facilityId/dashboard" element={<StaffLayout />}>
+            <Route
+              index
+              element={(
+                <>
+                  <FloorMonitorPage allView />
+                  <div data-testid="route-grid-normal">normal StaffLayout content child</div>
+                </>
+              )}
+            />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    const surface = await screen.findByTestId("monitor-surface");
+    const monitorRoot = await screen.findByTestId("monitor-root");
+    const normalSibling = await screen.findByTestId("route-grid-normal");
+    const main = document.querySelector("main.page-grid");
+    expect(main).not.toBeNull();
+    expect(monitorRoot.parentElement).toBe(main);
+    expect(normalSibling.parentElement).toBe(main);
+    expect(monitorRoot.className).toContain("page-bleed");
+    expect(surface.className).not.toContain("page-bleed");
+  });
+
   it("per-floor (focus) keeps overflow-hidden on the surface and h-full on the nightMode root", async () => {
     render(<FloorMonitorPage />);
 
     const surface = await screen.findByTestId("monitor-surface");
     expect(surface.className).toContain("overflow-hidden");
+    expect(surface.parentElement?.className).toContain("page-bleed");
     expect(surface.parentElement?.className).toContain("h-full");
+  });
+
+  it("passes the compact header contract only to the per-floor focus surface", async () => {
+    const { unmount } = render(<FloorMonitorPage />);
+    await screen.findByTestId("monitor-surface");
+    expect(monitorHeaderMock.mock.calls.at(-1)?.[0]).toMatchObject({ focus: true });
+    unmount();
+
+    render(<FloorMonitorPage allView />);
+    await screen.findByTestId("monitor-surface");
+    expect(monitorHeaderMock.mock.calls.at(-1)?.[0]).toMatchObject({ focus: false });
   });
 
   it("never renders the -translate-x-1/2 hack in either mode", async () => {

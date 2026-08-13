@@ -178,15 +178,16 @@ export function FloorMonitorPage({ allView = false }: { allView?: boolean }) {
   return (
     <div
       ref={rootRef}
-      className={[nightMode ? "dark" : "", allView ? "" : "h-full"].filter(Boolean).join(" ")}
+      data-testid="monitor-root"
+      className={["page-bleed", nightMode ? "dark" : "", allView ? "" : "h-full"].filter(Boolean).join(" ")}
     >
       <div
         data-testid="monitor-surface"
         style={!allView && isFullscreen ? { height: "100dvh" } : undefined}
         className={
           allView
-            ? "page-bleed flex flex-col bg-bg p-5 2xl:p-8"
-            : "page-bleed flex h-full flex-col overflow-hidden bg-bg p-5 2xl:p-8"
+            ? "flex flex-col bg-bg p-5 2xl:p-8"
+            : "flex h-full flex-col overflow-hidden bg-bg p-5 2xl:p-8"
         }
       >
         <MonitorHeader
@@ -205,6 +206,7 @@ export function FloorMonitorPage({ allView = false }: { allView?: boolean }) {
           facilityId={facilityId}
           showAllView={allowAllView}
           disconnectedRooms={disconnectedRooms}
+          focus={!allView}
         />
 
         <div className="mt-4 flex min-h-0 flex-1 flex-col gap-3">

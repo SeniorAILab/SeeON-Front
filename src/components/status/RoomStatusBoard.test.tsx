@@ -193,9 +193,23 @@ describe("RoomStatusBoard layout-aware containment (todo 6)", () => {
     expect(section?.className).not.toContain("h-full");
     expect(section?.className).not.toContain("flex-1");
     expect(section?.className).toContain("min-h-0");
+    const overflowScrollClasses = [
+      "overflow-auto",
+      "overflow-scroll",
+      "overflow-x-auto",
+      "overflow-y-auto",
+      "overflow-x-scroll",
+      "overflow-y-scroll",
+    ];
+    for (const className of overflowScrollClasses) {
+      expect(section?.className).not.toContain(className);
+    }
 
     const slot = innerSlot(container);
     expect(slot.className).not.toContain("overflow-hidden");
+    for (const className of overflowScrollClasses) {
+      expect(slot.className).not.toContain(className);
+    }
     expect(slot.className).not.toContain("flex-1");
     expect(slot.className).toContain("min-h-0");
   });

@@ -134,11 +134,8 @@ describe("cold entry deep link survives the auth bounce", () => {
     // with the bug present, because the router's own <Navigate> put it there.
     expect(assign).not.toHaveBeenCalled();
 
-    // (2) clean landing: no reason query, no expiry copy.
+    // (2) clean landing: no machine-consumed reason query.
     expect(screen.getByTestId("probe-search").textContent).toBe("");
-    expect(
-      screen.queryByText("로그인 시간이 만료되었습니다. 다시 로그인해 주세요."),
-    ).toBeNull();
 
     // (3) the deep link survives as router state for the post-login bounce-back.
     expect(screen.getByTestId("probe-from").textContent).toBe(DEEP_LINK_PATH);

@@ -94,6 +94,47 @@ describe("MonitorHeader floor selector", () => {
   });
 });
 
+describe("MonitorHeader compact focus presentation", () => {
+  it("uses the compact DOM contract while retaining identity, risk, connection, floor navigation, and controls", () => {
+    render(
+      <MemoryRouter>
+        <MonitorHeader
+          facilityName="해피 요양원"
+          floorTitle="1F 생활실"
+          summary={{ ...summary, totalSpaces: 7, danger: 1 }}
+          totalPeople={3}
+          connection="NORMAL"
+          lastUpdateAt={null}
+          soundEnabled={false}
+          onToggleSound={vi.fn()}
+          onRefresh={vi.fn()}
+          fullscreenRef={createRef<HTMLElement>()}
+          floors={floors}
+          currentFloorId="fl_1f"
+          facilityId="fac_happy"
+          focus
+        />
+      </MemoryRouter>,
+    );
+
+    const header = document.querySelector("header")!;
+    expect(header.getAttribute("data-layout")).toBe("compact");
+    expect(header.querySelector('[data-monitor-header="identity"]')).not.toBeNull();
+    expect(header.querySelector('[data-monitor-header="risk-summary"]')).not.toBeNull();
+    expect(header.querySelector('[data-monitor-header="connection"]')).not.toBeNull();
+    expect(header.querySelector('[data-monitor-header="controls"]')).not.toBeNull();
+    expect(within(header).getByRole("navigation", { name: "층 선택" })).not.toBeNull();
+  });
+
+  it("keeps the default presentation separate from the compact focus contract", () => {
+    renderHeader();
+
+    const header = document.querySelector("header")!;
+    expect(header.hasAttribute("data-layout")).toBe(false);
+    expect(header.className).toBe("space-y-3");
+  });
+});
+
 describe("MonitorHeader — 연결 끊김 알림 벨", () => {
   const disconnected = [
     { spaceId: "sp_205", name: "205호", lastSeenAt: "2026-08-01T06:47:44.174Z" },

@@ -85,37 +85,6 @@ describe("이벤트 유형 표시", () => {
     expect(screen.queryByText("bed-exit")).toBeNull();
   });
 
-  it("renders SYSTEM_TEST with machine correlation markers and no room or resident assumptions", async () => {
-    const alertService = await svc();
-    vi.mocked(alertService.listRecent).mockResolvedValue([
-      {
-        ...resolvedAlert,
-        id: "alert-system-page-1",
-        backendEventId: "event-system-page-1",
-        status: "NEW",
-        type: "SYSTEM_TEST",
-        spaceId: null,
-        room: null,
-        residentId: null,
-        residentName: null,
-        cameraId: null,
-        testMode: "SYSTEM_TEST",
-        label: "SYSTEM TEST - NOT A RESIDENT ALERT",
-        ttsText: "System test emergency notification",
-      } as unknown as AlertView,
-    ]);
-
-    const { container } = render(<AlertsPage />);
-
-    expect(await screen.findByText("SYSTEM TEST")).toBeTruthy();
-    const card = container.querySelector('[data-test-mode="SYSTEM_TEST"]');
-    expect(card?.getAttribute("data-alert-id")).toBe("alert-system-page-1");
-    expect(card?.getAttribute("data-backend-event-id")).toBe("event-system-page-1");
-    expect(card?.getAttribute("data-correlation-id")).toBe("event-system-page-1");
-    expect(card?.textContent).not.toContain("201호");
-    expect(card?.className).not.toContain("status-danger");
-  });
-
   it("등록되지 않은 유형은 원문 대신 '새 안전 알림'으로 안전하게 표시된다", async () => {
     const alertService = await svc();
     vi.mocked(alertService.listRecent).mockResolvedValue([

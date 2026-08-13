@@ -4,7 +4,6 @@ import { Filter, RefreshCw, AlertTriangle } from "lucide-react";
 import { StatsBar } from "@/features/dashboard/components/StatsBar";
 import { FloorTabs } from "@/features/dashboard/components/FloorTabs";
 import { RoomStatusBoard } from "@/components/status/RoomStatusBoard";
-import { SystemTestAlertBanner } from "@/components/status/SystemTestAlertBanner";
 import { Select } from "@/components/ui/primitives";
 import { useDashboard } from "@/features/dashboard/hooks/useDashboard";
 import { useMonitorStore } from "@/stores/monitorStore";
@@ -47,16 +46,9 @@ export function DashboardPage() {
   }, [data, floorFilter, statusFilter, typeFilter]);
   const alertsBySpace = useMemo(() => {
     const groups: Record<string, NonNullable<typeof data>["unacknowledgedEvents"]> = {};
-    for (const alert of data?.unacknowledgedEvents ?? []) {
-      if (!alert.spaceId || alert.testMode === "SYSTEM_TEST") continue;
-      groups[alert.spaceId] = [...(groups[alert.spaceId] ?? []), alert];
-    }
+    for (const alert of data?.unacknowledgedEvents ?? []) groups[alert.spaceId] = [...(groups[alert.spaceId] ?? []), alert];
     return groups;
   }, [data?.unacknowledgedEvents]);
-  const systemTestAlerts = useMemo(
-    () => (data?.unacknowledgedEvents ?? []).filter((alert) => alert.testMode === "SYSTEM_TEST"),
-    [data?.unacknowledgedEvents],
-  );
 
 
   if (loading && !data) {
@@ -80,11 +72,6 @@ export function DashboardPage() {
           새로고침
         </button>
       </div>
-
-      <SystemTestAlertBanner
-        alerts={systemTestAlerts}
-        surface="admin-system-test-banner:overview"
-      />
 
       {/* 위험 알림 배너 */}
       {data.summary.danger > 0 && (

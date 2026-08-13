@@ -6,33 +6,20 @@ import { playTTS, cancelTTS } from "./playTTS";
 import type { TTSFailureReason } from "./ttsProvider";
 import { textFor } from "./audioMap";
 import type { AudioLevel } from "./ttsConfig";
-import { SYSTEM_TEST_TTS_TEXT, type SystemTestMode } from "@/types";
 
 export type TTSLevel = "EMERGENCY" | "DANGER" | "CAUTION";
 
-interface TTSAlertBase {
+export interface TTSAlertInput {
   identity: string;
-  level: TTSLevel;
-  reason: string;
-}
-
-export interface TTSIncidentAlertInput extends TTSAlertBase {
   kind: "INCIDENT";
   spaceId: string;
   name: string;
+  level: TTSLevel;
+  reason: string;
   floorName: string;
 }
 
-export interface TTSSystemTestAlertInput extends TTSAlertBase {
-  kind: "SYSTEM_TEST";
-  spaceId: null;
-  name: null;
-  floorName: null;
-  testMode: SystemTestMode;
-  ttsText: typeof SYSTEM_TEST_TTS_TEXT;
-}
-
-export type TTSAlertInput = TTSIncidentAlertInput | TTSSystemTestAlertInput;
+export type TTSIncidentAlertInput = TTSAlertInput;
 
 const PRIORITY: Record<TTSLevel, number> = { EMERGENCY: 0, DANGER: 1, CAUTION: 2 };
 const AUDIO_LEVEL: Record<TTSLevel, AudioLevel> = {
@@ -138,9 +125,7 @@ export class TTSManager {
         firstAnnouncement,
         priority: PRIORITY[item.level],
         seq: this.nextSeq++,
-        text: item.kind === "SYSTEM_TEST"
-          ? item.ttsText
-          : textFor(item.name, AUDIO_LEVEL[item.level]),
+        text: textFor(item.name, AUDIO_LEVEL[item.level]),
       });
       this.queue.sort((a, b) =>
         (a.firstAnnouncement === b.firstAnnouncement ? 0 : a.firstAnnouncement ? -1 : 1) ||

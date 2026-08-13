@@ -107,22 +107,17 @@ export function EventsPage() {
         <div className="space-y-2.5">
           {filtered.map((ev) => {
             const acked = ev.alertStatus === "ACKNOWLEDGED";
-            const systemTest = ev.testMode === "SYSTEM_TEST";
             return (
               <Card
                 key={ev.id}
-                data-alert-id={ev.id}
-                data-backend-event-id={ev.backendEventId ?? undefined}
-                data-correlation-id={ev.backendEventId ?? ev.id}
-                data-test-mode={ev.testMode}
                 onClick={() => navigate(adminPath(facilityId, `events/${ev.id}`))}
                 className="flex cursor-pointer flex-wrap items-center gap-3 p-4 transition-colors hover:border-brand/40"
               >
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    {!systemTest && ev.spaceId && <span className="font-semibold text-ink">{spaceName(ev.spaceId)}</span>}
+                    <span className="font-semibold text-ink">{spaceName(ev.spaceId)}</span>
                     <span className="text-sm text-ink-soft">{eventTypeLabel[ev.eventType]}</span>
-                    {!systemTest && <RiskBadge level={ev.riskLevel} />}
+                    <RiskBadge level={ev.riskLevel} />
                     <AlertStatusBadge status={ev.alertStatus} />
                   </div>
                   <p className="mt-1 text-sm text-ink-soft">{ev.aiSummary}</p>

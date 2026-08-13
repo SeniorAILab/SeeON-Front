@@ -308,6 +308,45 @@ describe("monitorStore live alert merge", () => {
 
     useMonitorStore.getState().stop();
   });
+  it("ignores an unsupported SYSTEM_TEST SSE payload without changing the ordinary alert or speech inputs", async () => {
+    const sendMessage = stubEventSource();
+    const fetchMock = dashboardFetch();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { useMonitorStore } = await import("./monitorStore");
+    const { buildTTSAlerts } = await import("@/features/monitor/hooks/useTTSAlerts");
+    const ready = storeSignal(useMonitorStore, (state) => state.dashboard !== null && !state.loading);
+    useMonitorStore.getState().start(SCOPED_FACILITY_ID, 60_000);
+    await ready;
+    const before = useMonitorStore.getState();
+
+    expect(() => sendMessage({
+      alertSeq: "unsupported-1",
+      id: "unsupported-system-event",
+      backendEventId: "unsupported-backend-event",
+      facilityId: SCOPED_FACILITY_ID,
+      residentId: null,
+      cameraId: "cam_sp_201",
+      spaceId: "sp_201",
+      room: "201호",
+      type: "SYSTEM_TEST",
+      probability: 0.95,
+      detectedAt: "2026-08-13T00:00:00.000Z",
+      status: "NEW",
+    })).not.toThrow();
+
+    const after = useMonitorStore.getState();
+    expect(after.dashboard).toEqual(before.dashboard);
+    expect(after.statuses).toEqual(before.statuses);
+    expect(after.connection).toBe(before.connection);
+    expect(after.lastUpdateAt).toBe(before.lastUpdateAt);
+    expect(after.dashboard?.unacknowledgedEvents).toEqual([]);
+    expect(buildTTSAlerts([activeSpace], after.statuses, [], after.dashboard?.unacknowledgedEvents)).toEqual([]);
+    expect(fetchMock.mock.calls.some(([input]) => String(input).includes("/dashboard/receipts/"))).toBe(false);
+
+    useMonitorStore.getState().stop();
+  });
+
   it("keeps danger when an older resolved alert arrives after a newer active alert", async () => {
     const sendMessage = stubEventSource();
     vi.stubGlobal("fetch", dashboardFetch());

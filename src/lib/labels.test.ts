@@ -3,7 +3,6 @@ import { detectionEventPresentationFor, displayEventTypeLabel, eventPresentation
 import type { DetectionEventType } from "@/types";
 
 const knownEventTypes: Record<DetectionEventType, string> = {
-  SYSTEM_TEST: "SYSTEM TEST",
   STABLE: "안정 상태",
   MOVEMENT_INCREASE: "움직임 증가",
   REPEATED_STANDING_ATTEMPT: "반복 기립 시도",
@@ -56,7 +55,6 @@ describe("eventTypeLabel", () => {
 
 describe("detectionEventPresentationFor", () => {
   const allEventTypes: DetectionEventType[] = [
-    "SYSTEM_TEST",
     "STABLE",
     "MOVEMENT_INCREASE",
     "REPEATED_STANDING_ATTEMPT",
@@ -72,12 +70,7 @@ describe("detectionEventPresentationFor", () => {
     for (const eventType of allEventTypes) {
       const presentation = detectionEventPresentationFor(eventType);
       expect(presentation.icon).toBeTruthy();
-      // SYSTEM_TEST uses English sentinel; all others must be Korean
-      if (eventType !== "SYSTEM_TEST") {
-        expect(presentation.title).toMatch(/[가-힣]/);
-      } else {
-        expect(presentation.title).toBe("SYSTEM TEST");
-      }
+      expect(presentation.title).toMatch(/[가-힣]/);
       expect(presentation.phrase).toBeTruthy();
     }
   });
@@ -136,13 +129,6 @@ describe("eventPresentationFor", () => {
     for (const type of knownWireTypes) {
       expect(eventPresentationFor(type).title).not.toBe(type);
     }
-  });
-
-  it("presents SYSTEM_TEST as the shipped sentinel without emergency severity", () => {
-    const presentation = eventPresentationFor("SYSTEM_TEST");
-
-    expect(presentation.title).toBe("SYSTEM TEST");
-    expect(presentation.severity).toBe("medium");
   });
 
   it('falls back to "새 안전 알림" for an unregistered event type, never the raw string', () => {

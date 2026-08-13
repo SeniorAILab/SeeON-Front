@@ -1,10 +1,8 @@
 import { useState } from "react";
-import { Activity, ArrowRightLeft, RefreshCw } from "lucide-react";
+import { ArrowRightLeft, RefreshCw } from "lucide-react";
 
-import { Button, Card, Field, Input, Select, Textarea } from "@/components/ui/primitives";
+import { Button, Card, Field, Input, Textarea } from "@/components/ui/primitives";
 import {
-  createEdgeValidationRun,
-  listEdgeValidationEvents,
   replaceEdgeInstallation,
   transferEdgeOwnership,
   type OneTimeCredential,
@@ -28,7 +26,6 @@ export function InstallationLifecyclePanel({
   onChanged,
 }: InstallationLifecyclePanelProps) {
   const [clientRef, setClientRef] = useState("");
-  const [durationSeconds, setDurationSeconds] = useState("900");
   const [serverRevision, setServerRevision] = useState("");
   const [manifestDigest, setManifestDigest] = useState("");
   const [manifest, setManifest] = useState("");
@@ -59,33 +56,6 @@ export function InstallationLifecyclePanel({
     } catch (caught) {
       if (caught instanceof Error) {
         setError("설치를 교체하지 못했습니다. 세대와 설치 참조 ID를 확인해 주세요.");
-      } else {
-        throw caught;
-      }
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function handleValidation(): Promise<void> {
-    setBusy(true);
-    setError(null);
-    setStatus(null);
-    try {
-      const run = await createEdgeValidationRun({
-        edgeInstallationId,
-        expectedEnrollmentGeneration: enrollmentGeneration,
-        durationSeconds: Number(durationSeconds),
-        idempotencyKey: createIdempotencyKey(),
-      });
-      const events = await listEdgeValidationEvents({
-        edgeInstallationId,
-        validationRunId: run.validationRunId,
-      });
-      setStatus(`검증 이벤트 ${events.length}건`);
-    } catch (caught) {
-      if (caught instanceof Error) {
-        setError("검증 실행 상태를 확인하지 못했습니다. 다시 시도해 주세요.");
       } else {
         throw caught;
       }
@@ -155,25 +125,6 @@ export function InstallationLifecyclePanel({
           </Field>
           <Button variant="danger" disabled={busy || clientRef.trim().length === 0} onClick={() => setConfirmation("replace")}>
             설치 교체
-          </Button>
-        </div>
-      </section>
-
-      <section aria-labelledby="validation-run-title" className="border-t border-border pt-4">
-        <h3 id="validation-run-title" className="flex items-center gap-2 text-sm font-bold text-ink">
-          <Activity aria-hidden="true" className="h-4 w-4" />
-          검증 실행
-        </h3>
-        <div className="mt-3 flex flex-wrap items-end gap-3">
-          <Field label="검증 시간" htmlFor="edge-validation-duration">
-            <Select id="edge-validation-duration" value={durationSeconds} onChange={(event) => setDurationSeconds(event.target.value)}>
-              <option value="300">5분</option>
-              <option value="900">15분</option>
-              <option value="1800">30분</option>
-            </Select>
-          </Field>
-          <Button variant="secondary" disabled={busy} onClick={() => void handleValidation()}>
-            검증 실행
           </Button>
         </div>
       </section>

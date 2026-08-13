@@ -105,6 +105,21 @@ export class TTSManager {
     }
   }
 
+  /**
+   * Retries active alerts from a real browser user gesture after autoplay
+   * blocked speech. This intentionally drains synchronously so speak() stays
+   * in the gesture's call stack.
+   */
+  retryPendingOnUserGesture() {
+    if (!this.enabled) return;
+
+    const now = Date.now();
+    for (const item of this.items.values()) {
+      if (item.identity !== this.speakingIdentity) item.nextAt = now;
+    }
+    this.tick();
+  }
+
   private tick() {
     if (!this.enabled) return;
     const now = Date.now();
@@ -176,6 +191,13 @@ export class TTSManager {
 }
 
 export const ttsManager = new TTSManager();
+
+/** Scripted events must not acquire browser audio permission. */
+export function retryPendingTTSFromTrustedInteraction(event: Pick<Event, "isTrusted">): boolean {
+  if (!event.isTrusted) return false;
+  ttsManager.retryPendingOnUserGesture();
+  return true;
+}
 
 let failureReason: TTSFailureReason | null = null;
 const failureListeners = new Set<(reason: TTSFailureReason | null) => void>();

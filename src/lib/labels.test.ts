@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { displayEventTypeLabel, eventPresentationFor, eventTypeLabel } from "./labels";
+import { detectionEventPresentationFor, displayEventTypeLabel, eventPresentationFor, eventTypeLabel } from "./labels";
 import type { DetectionEventType } from "@/types";
 
 const knownEventTypes: Record<DetectionEventType, string> = {
@@ -51,6 +51,63 @@ describe("eventTypeLabel", () => {
     expect(displayEventTypeLabel({ eventType: "OTHER", backendType: "some-future-event-type" })).toBe(
       "알 수 없는 이벤트(some-future-event-type)"
     );
+  });
+});
+
+describe("detectionEventPresentationFor", () => {
+  const allEventTypes: DetectionEventType[] = [
+    "SYSTEM_TEST",
+    "STABLE",
+    "MOVEMENT_INCREASE",
+    "REPEATED_STANDING_ATTEMPT",
+    "FALL_RISK",
+    "SOLO_MOVEMENT",
+    "PROLONGED_INACTIVITY",
+    "WANDERING",
+    "BED_EXIT",
+    "OTHER",
+  ];
+
+  it("(a) every DetectionEventType key returns an icon + non-empty Korean title", () => {
+    for (const eventType of allEventTypes) {
+      const presentation = detectionEventPresentationFor(eventType);
+      expect(presentation.icon).toBeTruthy();
+      // SYSTEM_TEST uses English sentinel; all others must be Korean
+      if (eventType !== "SYSTEM_TEST") {
+        expect(presentation.title).toMatch(/[가-힣]/);
+      } else {
+        expect(presentation.title).toBe("SYSTEM TEST");
+      }
+      expect(presentation.phrase).toBeTruthy();
+    }
+  });
+
+  it("(b) FALL_RISK and BED_EXIT severity === high", () => {
+    expect(detectionEventPresentationFor("FALL_RISK").severity).toBe("high");
+    expect(detectionEventPresentationFor("BED_EXIT").severity).toBe("high");
+  });
+
+  it("(c) OTHER with backendType 'bed-exit' resolves title '침대 이탈'", () => {
+    const presentation = detectionEventPresentationFor("OTHER", { backendType: "bed-exit" });
+    expect(presentation.title).toBe("침대 이탈");
+  });
+
+  it("(d) OTHER with unregistered backendType never returns the raw string in the title", () => {
+    const presentation = detectionEventPresentationFor("OTHER", { backendType: "weird-thing" });
+    expect(presentation.title).not.toBe("weird-thing");
+    expect(presentation.title).toMatch(/[가-힣]/);
+  });
+
+  it("OTHER with empty-string backendType returns safe fallback without crash", () => {
+    expect(() => detectionEventPresentationFor("OTHER", { backendType: "" })).not.toThrow();
+    const presentation = detectionEventPresentationFor("OTHER", { backendType: "" });
+    expect(presentation.title).not.toBe("");
+  });
+
+  it("OTHER without backendType returns safe fallback without crash", () => {
+    expect(() => detectionEventPresentationFor("OTHER")).not.toThrow();
+    const presentation = detectionEventPresentationFor("OTHER");
+    expect(presentation.title).toBeTruthy();
   });
 });
 

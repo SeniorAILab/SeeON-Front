@@ -165,7 +165,7 @@ src/
 
 ### TTS 음성 안내
 
-헤더 "음성 안내" 토글(기본 꺼짐). 브라우저 `SpeechSynthesis` MVP. Provider 교체는 `src/features/monitor/services/tts/*` 인터페이스만 구현합니다. 첫 음성은 사용자 제스처 이후(자동재생 정책).
+헤더 "음성 안내" 토글(기본 켜짐). 브라우저 `SpeechSynthesis` MVP. Provider 교체는 `src/features/monitor/services/tts/*` 인터페이스만 구현합니다. 첫 음성은 사용자 제스처 이후(자동재생 정책).
 
 ---
 

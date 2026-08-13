@@ -232,13 +232,24 @@ describe("FloorMonitorPage — allView-keyed surface sizing", () => {
     expect(surface.className).not.toContain("page-bleed");
   });
 
-  it("per-floor (focus) keeps overflow-hidden on the surface and h-full on the nightMode root", async () => {
+  it("toggles the dark-mode wrapper class with the nightMode setting", async () => {
     render(<FloorMonitorPage />);
 
     const surface = await screen.findByTestId("monitor-surface");
+    const root = surface.parentElement;
     expect(surface.className).toContain("overflow-hidden");
-    expect(surface.parentElement?.className).toContain("page-bleed");
-    expect(surface.parentElement?.className).toContain("h-full");
+    expect(root?.className).not.toContain("dark");
+    expect(root?.className).toContain("page-bleed");
+    expect(root?.className).toContain("h-full");
+
+    act(() => {
+      useMonitorSettingsStore.getState().update({ nightMode: true });
+    });
+
+    await waitFor(() => expect(root?.className).toContain("dark"));
+    expect(root?.className).toContain("page-bleed");
+    expect(root?.className).toContain("h-full");
+    expect(surface.className).toContain("overflow-hidden");
   });
 
   it("passes the compact header contract only to the per-floor focus surface", async () => {

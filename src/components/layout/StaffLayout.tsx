@@ -1,13 +1,13 @@
 import { useEffect, type ReactNode } from "react";
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import { CheckCheck, Moon, Sun, Volume2, VolumeX, LogOut, Settings, MonitorPlay, Building2 } from "lucide-react";
+import { matchPath, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { CheckCheck, Moon, Sun, LogOut, Settings, MonitorPlay, Building2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LogoMark } from "@/components/Logo";
 import { useAuthStore } from "@/stores/authStore";
 import { canAdmin, roleLabel } from "@/lib/roles";
 import { useFacilityStore, facilitiesForUser } from "@/stores/facilityStore";
 import { useUiStore } from "@/stores/uiStore";
-import { useMonitorSettingsStore } from "@/features/monitor/stores/monitorSettingsStore";
+import { AudioToggleButton, useMonitorSettingsStore } from "@/features/monitor";
 import { listFacilities } from "@/services/api/dashboardEndpoints";
 import { FACILITIES_PICKER_PATH, adminPath, alertsPath, floorSelectPath } from "@/lib/routeAccess";
 
@@ -15,14 +15,15 @@ export function StaffLayout() {
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
   const navigate = useNavigate();
+  const location = useLocation();
   const theme = useUiStore((s) => s.theme);
   const toggleTheme = useUiStore((s) => s.toggleTheme);
-  // 소리의 SSOT는 monitorSettingsStore.alertSound 하나다. 예전에는 여기서
-  // uiStore.soundEnabled를 토글했는데 실제 TTS는 alertSound를 읽어서,
-  // 헤더는 "켜짐"인데 소리는 안 나는 상태가 됐다.
   const soundEnabled = useMonitorSettingsStore((s) => s.alertSound);
   const updateSettings = useMonitorSettingsStore((s) => s.update);
   const toggleSound = () => updateSettings({ alertSound: !soundEnabled });
+  const isMonitorRoute =
+    matchPath("/facilities/:facilityId/dashboard", location.pathname) !== null ||
+    matchPath("/facilities/:facilityId/floor/:floorId", location.pathname) !== null;
   const userFacilityId = user?.facilityId ?? null;
   const userId = user?.id;
   const userRole = user?.role;
@@ -87,9 +88,9 @@ export function StaffLayout() {
           </div>
 
           <div className="flex w-full flex-wrap items-center gap-1 sm:ml-auto sm:w-auto sm:flex-nowrap">
-            <IconBtn onClick={toggleSound} label={soundEnabled ? "소리 알림 켜짐" : "소리 알림 꺼짐"}>
-              {soundEnabled ? <Volume2 className="h-6 w-6" /> : <VolumeX className="h-6 w-6" />}
-            </IconBtn>
+            {!isMonitorRoute && (
+              <AudioToggleButton enabled={soundEnabled} onToggle={toggleSound} />
+            )}
             <IconBtn onClick={toggleTheme} label={theme === "dark" ? "밝게" : "어둡게"}>
               {theme === "dark" ? <Sun className="h-6 w-6" /> : <Moon className="h-6 w-6" />}
             </IconBtn>

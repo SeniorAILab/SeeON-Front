@@ -1,5 +1,12 @@
-import { useEffect, useMemo } from "react";
-import { ttsManager, type TTSAlertInput } from "@/features/monitor/services/tts/ttsManager";
+import { useEffect, useMemo, useState } from "react";
+import {
+  getTTSFailureReason,
+  retryPendingTTSFromTrustedInteraction,
+  subscribeTTSFailure,
+  ttsManager,
+  type TTSAlertInput,
+} from "@/features/monitor/services/tts/ttsManager";
+import type { TTSFailureReason } from "@/features/monitor/services/tts/ttsProvider";
 import type { DetectionEvent, Floor, Space, SpaceStatus } from "@/types";
 
 /** Alert identity is the queue key; space state is only a fallback when no alert DTO exists. */
@@ -56,6 +63,9 @@ export function buildTTSAlerts(
 }
 
 export function useTTSAlerts(alerts: TTSAlertInput[], enabled: boolean) {
+  const [failure, setFailure] = useState<TTSFailureReason | null>(() =>
+    getTTSFailureReason(),
+  );
   const signature = useMemo(
     () => alerts
       .map((alert) => `${alert.identity}:${alert.level}`)
@@ -63,6 +73,25 @@ export function useTTSAlerts(alerts: TTSAlertInput[], enabled: boolean) {
       .join("|"),
     [alerts],
   );
+  useEffect(() => subscribeTTSFailure(setFailure), []);
+  useEffect(() => {
+    if (!enabled || failure !== "blocked") return;
+
+    let removed = false;
+    const removeListeners = () => {
+      if (removed) return;
+      removed = true;
+      document.removeEventListener("pointerdown", onInteraction, true);
+      document.removeEventListener("keydown", onInteraction, true);
+    };
+    const onInteraction = (event: Event) => {
+      if (retryPendingTTSFromTrustedInteraction(event)) removeListeners();
+    };
+
+    document.addEventListener("pointerdown", onInteraction, true);
+    document.addEventListener("keydown", onInteraction, true);
+    return removeListeners;
+  }, [enabled, failure]);
   useEffect(() => {
     ttsManager.update(alerts, enabled);
     // The primitive signature intentionally owns synchronization identity.

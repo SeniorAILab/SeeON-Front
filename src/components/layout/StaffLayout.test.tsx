@@ -1,10 +1,11 @@
 import type { ReactNode } from "react";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { StaffLayout } from "@/components/layout/StaffLayout";
 import { useAuthStore } from "@/stores/authStore";
 import { useFacilityStore } from "@/stores/facilityStore";
+import { useMonitorSettingsStore } from "@/features/monitor/stores/monitorSettingsStore";
 
 // jsdom은 스타일시트를 로드하지 않고 grid-template-columns 같은 shorthand를 계산하지
 // 않는다 (src/components/status/RoomStatusTreemap.test.tsx:196 참고). 그래서 여기서는
@@ -85,5 +86,67 @@ describe("StaffLayout shell", () => {
     await screen.findByText("normal content");
     const normalChild = normalContainer.querySelector('[data-testid="normal-child"]');
     expect(normalChild?.className ?? "").not.toContain("page-bleed");
+  });
+});
+
+function renderAt(path: string) {
+  return render(
+    <MemoryRouter initialEntries={[path]}>
+      <Routes>
+        <Route path="/facilities/:facilityId/*" element={<StaffLayout />}>
+          <Route path="*" element={<div>staff outlet</div>} />
+        </Route>
+      </Routes>
+    </MemoryRouter>,
+  );
+}
+
+describe("StaffLayout audio control composition", () => {
+  beforeEach(() => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn<typeof fetch>().mockResolvedValue(
+        new Response(
+          JSON.stringify([
+            { id: facilityId, name: "행복한요양원", address: "", phone: "" },
+          ]),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      ),
+    );
+    useAuthStore.setState({
+      user: {
+        id: "staff-1",
+        name: "Care Staff",
+        email: "staff@example.test",
+        role: "STAFF",
+        facilityId: facilityId,
+      },
+      initialized: true,
+    });
+    useFacilityStore.setState({ currentFacilityId: facilityId, facilities: [] });
+    useMonitorSettingsStore.setState({ alertSound: true });
+  });
+
+  it("toggles the persisted alertSound setting on a non-monitor staff route", () => {
+    renderAt(`/facilities/${facilityId}/alerts`);
+
+    const enabled = screen.getByRole("button", { name: "음성 안내 켜짐" });
+    fireEvent.click(enabled);
+    expect(useMonitorSettingsStore.getState().alertSound).toBe(false);
+    expect(screen.getByRole("button", { name: "음성 안내 꺼짐" })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "음성 안내 꺼짐" }));
+    expect(useMonitorSettingsStore.getState().alertSound).toBe(true);
+    expect(screen.getByRole("button", { name: "음성 안내 켜짐" })).toBeTruthy();
+  });
+
+  it.each([
+    `/facilities/${facilityId}/dashboard`,
+    `/facilities/${facilityId}/floor/fl_2f`,
+  ])("omits the staff-header audio control on monitor route %s", (path) => {
+    renderAt(path);
+
+    expect(screen.queryByRole("button", { name: /^음성 안내 / })).toBeNull();
   });
 });

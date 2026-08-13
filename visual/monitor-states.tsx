@@ -238,8 +238,6 @@ function Harness() {
           totalPeople={overviewFlowSpaces.length}
           connection="NORMAL"
           lastUpdateAt={new Date().toISOString()}
-          soundEnabled
-          onToggleSound={() => {}}
           onRefresh={() => {}}
           fullscreenRef={rootRef as React.RefObject<HTMLElement>}
           floors={floors}
@@ -304,8 +302,6 @@ function Harness() {
         totalPeople={spaces.length}
         connection="NORMAL"
         lastUpdateAt={new Date().toISOString()}
-        soundEnabled
-        onToggleSound={() => {}}
         onRefresh={() => {}}
         fullscreenRef={rootRef as React.RefObject<HTMLElement>}
         floors={floors}

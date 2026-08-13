@@ -3,6 +3,7 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import { MonitorHeader } from "./MonitorHeader";
+import { useMonitorSettingsStore } from "@/features/monitor/stores/monitorSettingsStore";
 import type { DashboardSummary, Floor } from "@/types";
 
 const floors: Floor[] = [
@@ -39,8 +40,6 @@ function renderHeader(currentFloorId: string | null = "fl_1f", showAllView = tru
                 totalPeople={0}
                 connection="NORMAL"
                 lastUpdateAt={null}
-                soundEnabled={false}
-                onToggleSound={vi.fn()}
                 onRefresh={vi.fn()}
                 fullscreenRef={createRef<HTMLElement>()}
                 floors={floors}
@@ -58,6 +57,19 @@ function renderHeader(currentFloorId: string | null = "fl_1f", showAllView = tru
 }
 
 describe("MonitorHeader floor selector", () => {
+  it("supplies one persisted audio control and toggles it in both directions", () => {
+    useMonitorSettingsStore.setState({ alertSound: true });
+    renderHeader("fl_1f");
+
+    expect(screen.getAllByRole("button", { name: "음성 안내 켜짐" })).toHaveLength(1);
+    fireEvent.click(screen.getByRole("button", { name: "음성 안내 켜짐" }));
+    expect(useMonitorSettingsStore.getState().alertSound).toBe(false);
+    expect(screen.getAllByRole("button", { name: "음성 안내 꺼짐" })).toHaveLength(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "음성 안내 꺼짐" }));
+    expect(useMonitorSettingsStore.getState().alertSound).toBe(true);
+  });
+
   it("renders sorted floor tabs and marks the current floor", () => {
     renderHeader("fl_1f");
 
@@ -95,7 +107,8 @@ describe("MonitorHeader floor selector", () => {
 });
 
 describe("MonitorHeader compact focus presentation", () => {
-  it("uses the compact DOM contract while retaining identity, risk, connection, floor navigation, and controls", () => {
+  it("uses the compact DOM contract while retaining identity, risk, connection, floor navigation, and one audio control", () => {
+    useMonitorSettingsStore.setState({ alertSound: true });
     render(
       <MemoryRouter>
         <MonitorHeader
@@ -105,8 +118,6 @@ describe("MonitorHeader compact focus presentation", () => {
           totalPeople={3}
           connection="NORMAL"
           lastUpdateAt={null}
-          soundEnabled={false}
-          onToggleSound={vi.fn()}
           onRefresh={vi.fn()}
           fullscreenRef={createRef<HTMLElement>()}
           floors={floors}
@@ -124,6 +135,7 @@ describe("MonitorHeader compact focus presentation", () => {
     expect(header.querySelector('[data-monitor-header="connection"]')).not.toBeNull();
     expect(header.querySelector('[data-monitor-header="controls"]')).not.toBeNull();
     expect(within(header).getByRole("navigation", { name: "층 선택" })).not.toBeNull();
+    expect(within(header).getAllByRole("button", { name: "음성 안내 켜짐" })).toHaveLength(1);
   });
 
   it("keeps the default presentation separate from the compact focus contract", () => {
@@ -155,8 +167,6 @@ describe("MonitorHeader — 연결 끊김 알림 벨", () => {
                 totalPeople={0}
                 connection="NORMAL"
                 lastUpdateAt={null}
-                soundEnabled={false}
-                onToggleSound={vi.fn()}
                 onRefresh={vi.fn()}
                 fullscreenRef={createRef<HTMLElement>()}
                 floors={floors}

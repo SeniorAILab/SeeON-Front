@@ -839,7 +839,10 @@ describe("monitorStore deterministic supervisors", () => {
     const snapshotArmed = deferred<void>();
     const heldSnapshot = deferred<Response>();
     const ttsUpdate = vi.fn();
-    vi.doMock("@/features/monitor/services/tts/ttsManager", () => ({
+    vi.doMock("@/features/monitor/services/tts/ttsManager", async (importOriginal) => ({
+      ...(await importOriginal<
+        typeof import("@/features/monitor/services/tts/ttsManager")
+      >()),
       ttsManager: { update: ttsUpdate },
     }));
     const baseFetch = dashboardFetch();

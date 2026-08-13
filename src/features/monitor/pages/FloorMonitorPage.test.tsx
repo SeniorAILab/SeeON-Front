@@ -94,6 +94,15 @@ describe("FloorMonitorPage", () => {
 
     await waitFor(() => expect(useTTSAlertsMock).toHaveBeenLastCalledWith([], true));
   });
+  it("keeps the monitor header inside the fullscreen root without a legacy sound prop path", async () => {
+    render(<FloorMonitorPage />);
+
+    await waitFor(() => expect(monitorHeaderMock).toHaveBeenCalled());
+    const props = monitorHeaderMock.mock.calls.at(-1)?.[0] as Record<string, unknown>;
+    expect(props.fullscreenRef).toBeTruthy();
+    expect("soundEnabled" in props).toBe(false);
+    expect("onToggleSound" in props).toBe(false);
+  });
   it("redirects legacy all-view settings to a configured floor when all-view is disabled", async () => {
     useMonitorSettingsStore.setState({ allowAllView: false, defaultFloorId: "all" });
 

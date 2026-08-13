@@ -191,8 +191,6 @@ export function FloorMonitorPage({ allView = false }: { allView?: boolean }) {
           totalPeople={totalPeople}
           connection={connection}
           lastUpdateAt={lastUpdateAt}
-          soundEnabled={alertSound}
-          onToggleSound={() => updateSettings({ alertSound: !alertSound })}
           onRefresh={() => void reload()}
           fullscreenRef={rootRef}
           floors={floors}

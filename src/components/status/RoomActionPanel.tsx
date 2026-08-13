@@ -201,7 +201,7 @@ export function RoomActionPanel({
           RESOLVED가 아닌 한 계속 "활성"으로 보므로(alertMerge.ts:226-228),
           resolve() 호출만이 알림을 보드에서 내릴 수 있다. 두 단계로 나뉜
           예전 흐름은 더 이상 없다 — 이 버튼 하나가 전부다. */}
-      <div className="mt-4 flex flex-wrap gap-2">
+      <div className="mt-4 flex flex-wrap justify-end gap-2">
         <button
           type="button"
           disabled={!canResolve || busy}

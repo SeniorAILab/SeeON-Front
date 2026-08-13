@@ -278,5 +278,3 @@ const eventPresentationRegistry: Record<string, EventPresentation> = {
 export function eventPresentationFor(type: string): EventPresentation {
   return eventPresentationRegistry[type] ?? UNKNOWN_EVENT_PRESENTATION;
 }
-
-

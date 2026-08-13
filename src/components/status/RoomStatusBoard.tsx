@@ -110,7 +110,15 @@ export function RoomStatusBoard({
   );
 
   return (
-    <section data-card-size={cardSize} className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden rounded-3xl border border-border bg-surface p-3 shadow-card 2xl:p-4" aria-label="방 상태 보드">
+    <section
+      data-card-size={cardSize}
+      className={
+        layout === "focus"
+          ? "flex h-full min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden rounded-3xl border border-border bg-surface p-3 shadow-card 2xl:p-4"
+          : "flex min-h-0 w-full min-w-0 flex-col rounded-3xl border border-border bg-surface p-3 shadow-card 2xl:p-4"
+      }
+      aria-label="방 상태 보드"
+    >
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2 text-base font-black text-ink-soft 2xl:text-lg">
           <span className="rounded-full bg-status-dangerBg px-3 py-1 text-status-danger">위험</span>
@@ -120,7 +128,7 @@ export function RoomStatusBoard({
         </div>
         <ConnectionChip connection={connection} lastUpdateAt={lastUpdateAt} />
       </div>
-      <div className="min-h-0 flex-1 overflow-hidden">
+      <div className={layout === "focus" ? "min-h-0 flex-1 overflow-hidden" : "min-h-0"}>
         <RoomStatusTreemap spaces={spaces} statuses={visibleStatuses} floors={floors} selectedSpaceId={activeSpace?.id} onSelect={onSelectSpace} layout={layout} cardSize={cardSize} presentationAlertsBySpace={presentationAlertsBySpace} receiptSurface={RECEIPT_SURFACE_BY_VARIANT[_variant]} />
       </div>
       {activeSpace && (

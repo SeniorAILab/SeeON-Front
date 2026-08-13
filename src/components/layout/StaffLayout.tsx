@@ -74,7 +74,7 @@ export function StaffLayout() {
   }
 
   return (
-    <div className={cn("min-h-screen bg-bg", theme === "dark" && "dark")}>
+    <div className={cn("grid min-h-[100dvh] grid-rows-[auto_minmax(0,1fr)] bg-bg", theme === "dark" && "dark")}>
       <header className="sticky top-0 z-20 border-b border-border bg-surface/90 backdrop-blur">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-2 px-4 py-3 sm:gap-3">
           <LogoMark size={36} />
@@ -127,7 +127,7 @@ export function StaffLayout() {
         </nav>
       </header>
 
-      <main className="mx-auto max-w-5xl px-4 py-5">
+      <main className="page-grid min-h-0 py-5">
         <Outlet />
       </main>
     </div>

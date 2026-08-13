@@ -79,7 +79,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 }));
 
 setUnauthorizedHandler(() => {
+  const hadSession = useAuthStore.getState().user !== null;
   useAuthStore.setState({ user: null, initialized: true, loading: false });
+  if (!hadSession) return;
   if (window.location.pathname !== "/login") {
     window.location.assign("/login?reason=session-invalid");
   }

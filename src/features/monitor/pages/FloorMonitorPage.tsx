@@ -170,10 +170,19 @@ export function FloorMonitorPage({ allView = false }: { allView?: boolean }) {
   }
 
   return (
-    <div ref={rootRef} className={nightMode ? "dark" : ""}>
+    <div
+      ref={rootRef}
+      data-testid="monitor-root"
+      className={["page-bleed", nightMode ? "dark" : "", allView ? "" : "h-full"].filter(Boolean).join(" ")}
+    >
       <div
-        style={{ height: isFullscreen ? "100dvh" : "calc(100dvh - 11rem)" }}
-        className="relative left-1/2 flex w-screen -translate-x-1/2 flex-col overflow-hidden bg-bg p-5 2xl:p-8"
+        data-testid="monitor-surface"
+        style={!allView && isFullscreen ? { height: "100dvh" } : undefined}
+        className={
+          allView
+            ? "flex flex-col bg-bg p-5 2xl:p-8"
+            : "flex h-full flex-col overflow-hidden bg-bg p-5 2xl:p-8"
+        }
       >
         <MonitorHeader
           facilityName={facility.name}
@@ -191,6 +200,7 @@ export function FloorMonitorPage({ allView = false }: { allView?: boolean }) {
           facilityId={facilityId}
           showAllView={allowAllView}
           disconnectedRooms={disconnectedRooms}
+          focus={!allView}
         />
 
         <div className="mt-4 flex min-h-0 flex-1">

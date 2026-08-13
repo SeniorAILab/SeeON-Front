@@ -7,13 +7,20 @@
  *
  * 개발 전용. 프로덕션 번들에 포함되지 않는다.
  */
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { StaffLayout } from "@/components/layout/StaffLayout";
 import { RoomStatusBoard } from "@/components/status/RoomStatusBoard";
 import { MonitorHeader } from "@/features/monitor/components/MonitorHeader";
+import { FloorMonitorPage } from "@/features/monitor/pages/FloorMonitorPage";
+import { useAuthStore } from "@/stores/authStore";
+import { useFacilityStore } from "@/stores/facilityStore";
+import { useMonitorSettingsStore } from "@/features/monitor/stores/monitorSettingsStore";
 import { type DetectionEvent, type Floor, type Space, type SpaceStatus } from "@/types";
 import "@/index.css";
+
+const MODE = new URLSearchParams(location.search).get("mode") ?? "mixed";
 
 // 조작면은 메모 목록을 서버에서 불러온다. 하니스에는 백엔드가 없으므로
 // 그대로 두면 승인 화면에 **"메모를 불러오지 못했습니다" 빨간 오류가 뜬다.**
@@ -25,6 +32,27 @@ import "@/index.css";
 const realFetch = window.fetch.bind(window);
 window.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
   const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+  const pathname = new URL(url, location.href).pathname;
+  if (MODE === "route-grid" && pathname.startsWith("/api/v1/")) {
+    const body =
+      pathname === "/api/v1/facilities"
+        ? [routeGridFacility]
+        : pathname === `/api/v1/facilities/${FACILITY}`
+          ? routeGridFacility
+          : pathname === "/api/v1/floors"
+            ? floors
+            : pathname === "/api/v1/spaces"
+              ? overviewFlowSpaces
+              : pathname === "/api/v1/alerts" || pathname === "/api/v1/cameras"
+                ? []
+                : null;
+    return Promise.resolve(
+      new Response(JSON.stringify(body ?? { message: `Unhandled local fixture path: ${pathname}` }), {
+        status: body === null ? 404 : 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+  }
   if (/\/alerts\/[^/]+$/.test(url) && (init?.method ?? "GET").toUpperCase() === "GET") {
     return Promise.resolve(
       new Response(JSON.stringify({ notes: [] }), {
@@ -39,6 +67,12 @@ window.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
 const FACILITY = "fac_demo";
 // 시설명도 데모 값이다. 실제 이름은 어느 요양원인지 특정한다.
 const FACILITY_NAME = "데모 요양원";
+const routeGridFacility = {
+  id: FACILITY,
+  name: FACILITY_NAME,
+  address: "fixture-only",
+  phone: "fixture-only",
+};
 
 // 카메라 7대가 한 층이 아니라 세 층에 흩어진 구성. 층당 4/2/1개다.
 // 한 층으로 뭉쳐 찍으면 승인한 화면과 현장 화면의 층 구성이 달라지므로
@@ -100,9 +134,45 @@ const spaces: Space[] = [
   space("sp_a", "C-1", "fl_4f"),
 ];
 
-const MODE = new URLSearchParams(location.search).get("mode") ?? "mixed";
+// overview-flow 전용: 문서 스크롤이 실제로 발생하려면 1080px보다 콘텐츠가
+// 커야 한다. 층 하나에 방을 몰아 넣어 grid auto-fill이 여러 줄로 접히게
+// 만든다 - 실제 호실 번호가 아니라 데모용 순번이다.
+const OVERVIEW_FLOW_ROOM_COUNT = 24;
+const overviewFlowSpaces: Space[] = Array.from({ length: OVERVIEW_FLOW_ROOM_COUNT }, (_, i) =>
+  space(`sp_flow_${i}`, `D-${i + 1}`, "fl_2f"),
+);
+const overviewFlowStatuses: Record<string, SpaceStatus> = Object.fromEntries(
+  overviewFlowSpaces.map((sp) => [sp.id, status(sp.id, "STABLE", "LIVE")]),
+);
 
 
+
+if (MODE === "route-grid") {
+  useAuthStore.setState({
+    user: {
+      id: "fixture-staff",
+      name: "Fixture Staff",
+      email: "fixture.staff@example.test",
+      role: "STAFF",
+      facilityId: FACILITY,
+    },
+    initialized: true,
+    loading: false,
+    error: null,
+  });
+  useFacilityStore.setState({ currentFacilityId: FACILITY, facilities: [routeGridFacility] });
+  useMonitorSettingsStore.setState({
+    alertSound: false,
+    allowAllView: true,
+    defaultFloorId: "all",
+    visibleSpaceIds: null,
+    cardSize: "lg",
+    nightMode: false,
+  });
+  // The real page starts the monitor store; undefined makes it use the fixture-backed REST seam,
+  // never a live SSE connection.
+  Object.defineProperty(window, "EventSource", { configurable: true, value: undefined });
+}
 
 const statuses: Record<string, SpaceStatus> =
   MODE === "all-live"
@@ -139,8 +209,68 @@ const statuses: Record<string, SpaceStatus> =
 // 벨 숫자 배지로만 알린다"는 요구의 산출물이라, 그게 빠진 스크린샷을
 // 승인받으면 정작 요구한 물건을 승인하지 못한 것이 된다.
 // FloorMonitorPage:172가 헤더를 보드 위에 두는 것과 같은 구성이다.
+//
+// overview-flow는 별도 컴포넌트로 뽑지 않고 이 함수 안에서 조기 반환한다 -
+// 컴포넌트 선언이 파일에 늘어날수록 react-refresh/only-export-components
+// 경고가 하나씩 늘어난다(이 파일은 export가 전혀 없는 개발 전용 진입점).
+// Hooks 규칙을 지키기 위해 useState는 분기 이전에 무조건 호출한다.
 function Harness() {
   const rootRef = useRef<HTMLDivElement>(null);
+  const [selected, setSelected] = useState<Space | null>(null);
+
+  if (MODE === "overview-flow") {
+    const danger = 0;
+    const stable = overviewFlowSpaces.length;
+    return (
+      <div data-testid="css-track-probe" className="page-grid">
+        <div ref={rootRef} data-testid="visual-root" className="page-bleed bg-bg p-4">
+        <MonitorHeader
+          facilityName={FACILITY_NAME}
+          floorTitle="전체"
+          summary={{
+            totalSpaces: overviewFlowSpaces.length,
+            stable,
+            caution: 0,
+            danger,
+            checkNeeded: danger,
+            unacknowledged: 0,
+          }}
+          totalPeople={overviewFlowSpaces.length}
+          connection="NORMAL"
+          lastUpdateAt={new Date().toISOString()}
+          soundEnabled
+          onToggleSound={() => {}}
+          onRefresh={() => {}}
+          fullscreenRef={rootRef as React.RefObject<HTMLElement>}
+          floors={floors}
+          currentFloorId={null}
+          facilityId={FACILITY}
+          disconnectedRooms={[]}
+        />
+        {/* FloorMonitorPage의 allView 경로와 같은 구성 - 고정 높이 없이 문서 흐름을 따른다. */}
+        <div className="mt-4 flex flex-col gap-3">
+          <RoomStatusBoard
+            selectedSpace={selected}
+            onSelectSpace={setSelected}
+            onClosePanel={() => setSelected(null)}
+            alertsBySpace={{}}
+            spaces={overviewFlowSpaces}
+            statuses={overviewFlowStatuses}
+            floors={floors}
+            connection="NORMAL"
+            lastUpdateAt={new Date().toISOString()}
+            variant="staff"
+            layout="overview"
+            cardSize="lg"
+          />
+        </div>
+        </div>
+        {/* 실제 StaffLayout -> Outlet 관계처럼 monitor root와 일반 자식은 page-grid의 직접 자식이다. */}
+        <div data-testid="css-track-normal">normal</div>
+      </div>
+    );
+  }
+
   const disconnected = spaces
     .filter((sp) => statuses[sp.id]?.connection === "STALE")
     .map((sp) => ({ spaceId: sp.id, name: sp.name, lastSeenAt: null }));
@@ -148,11 +278,18 @@ function Harness() {
   const stable = Object.values(statuses).filter((st) => st.status === "STABLE").length;
 
   return (
-    <div
-      ref={rootRef}
-      data-testid="visual-root"
-      className="flex h-screen w-screen flex-col bg-bg p-4"
-    >
+    <div className="page-grid">
+      <div
+        ref={rootRef}
+        data-testid="visual-root"
+      // tailwind.config.js의 content 글로백("./index.html", "./src/**/*.{ts,tsx}")이 visual/를
+      // 스캔하지 않아, src/ 어디에서도 쓰이지 않는 바어(bare) h-screen/w-screen은
+      // JIT 산출물에 아에당 규칙 자체가 없다 - 측정으로 직접 발견된 명징(measure focus-wall.b_clientHeight_ge_900:
+      // 1080이 아니라 886으로 측정됨). 측정이 무의미해지지 않도록 실제 CSS로 보장되는 inline
+      // style로 뷰포트 크기를 고정한다.
+      style={{ width: "100vw", height: "100vh" }}
+        className="page-bleed flex flex-col bg-bg p-4"
+      >
       <MonitorHeader
         facilityName={FACILITY_NAME}
         floorTitle="전체"
@@ -174,6 +311,7 @@ function Harness() {
         floors={floors}
         currentFloorId={null}
         facilityId={FACILITY}
+        focus={MODE === "focus-wall"}
         // 연결 끊긴 방이 벨 배지의 숫자가 된다. 지어낸 숫자를 쓰지 않는다.
         disconnectedRooms={disconnected}
       />
@@ -212,13 +350,14 @@ function Harness() {
         connection="NORMAL"
         lastUpdateAt={new Date().toISOString()}
         variant="staff"
-        layout="overview"
+        layout={MODE === "focus-wall" ? "focus" : "overview"}
         // 프로덕션 기본값과 같은 값을 쓴다(monitorSettingsStore.ts:14 = "lg").
         // 여기서 "xl"을 쓰면 승인한 화면이 실제 TV보다 크게 그려져,
         // 넘침 여부를 승인 시점에 판별할 수 없다.
         cardSize="lg"
       />
-      </div>
+        </div>
+        </div>
       </div>
     </div>
   );
@@ -227,7 +366,25 @@ function Harness() {
 // MonitorHeader가 라우터 훅(useNavigate)을 쓰므로 Router로 감싼다.
 // 감싸지 않으면 하니스가 흰 화면으로 뜨고, 그걸 승인 산출물로 착각하기 쉽다.
 createRoot(document.getElementById("root")!).render(
-  <MemoryRouter>
-    <Harness />
-  </MemoryRouter>,
+  MODE === "route-grid" ? (
+    <MemoryRouter initialEntries={[`/facilities/${FACILITY}/dashboard`]}>
+      <Routes>
+        <Route path="/facilities/:facilityId/dashboard" element={<StaffLayout />}>
+          <Route
+            index
+            element={(
+              <>
+                <FloorMonitorPage allView />
+                <div data-testid="route-grid-normal">normal StaffLayout content child</div>
+              </>
+            )}
+          />
+        </Route>
+      </Routes>
+    </MemoryRouter>
+  ) : (
+    <MemoryRouter>
+      <Harness />
+    </MemoryRouter>
+  ),
 );

@@ -130,4 +130,134 @@ describe("authStore session invalidation", () => {
       loading: false,
     });
   });
+
+  it("hard-bounces to /login?reason=session-invalid when a user WAS present (today's behavior, pinned)", async () => {
+    window.history.replaceState(null, "", "/facilities/facility-1/dashboard");
+    useAuthStore.setState({
+      user: {
+        id: "user-1",
+        name: "관리자",
+        email: "admin@sen.ai",
+        role: "ADMIN",
+        facilityId: "facility-1",
+      },
+      initialized: true,
+      loading: true,
+      error: null,
+    });
+    const assign = vi.fn();
+    vi.stubGlobal("location", { ...window.location, pathname: "/facilities/facility-1/dashboard", assign });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn<typeof fetch>().mockResolvedValue(new Response("Unauthorized", { status: 401 }))
+    );
+
+    const { requestJson } = await import("@/services/apiClient");
+
+    await expect(requestJson("/protected")).rejects.toMatchObject({ status: 401 });
+
+    expect(assign).toHaveBeenCalledTimes(1);
+    expect(assign).toHaveBeenCalledWith("/login?reason=session-invalid");
+    expect(useAuthStore.getState()).toMatchObject({
+      user: null,
+      initialized: true,
+      loading: false,
+    });
+  });
+
+  it("does NOT bounce when a 401 arrives with no prior session (visitor who never logged in)", async () => {
+    window.history.replaceState(null, "", "/facilities/facility-1/dashboard");
+    useAuthStore.setState({
+      user: null,
+      initialized: false,
+      loading: true,
+      error: null,
+    });
+    const assign = vi.fn();
+    vi.stubGlobal("location", { ...window.location, pathname: "/facilities/facility-1/dashboard", assign });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn<typeof fetch>().mockResolvedValue(new Response("Unauthorized", { status: 401 }))
+    );
+
+    const { requestJson } = await import("@/services/apiClient");
+
+    await expect(requestJson("/protected")).rejects.toMatchObject({ status: 401 });
+
+    expect(assign).not.toHaveBeenCalled();
+    expect(useAuthStore.getState()).toMatchObject({
+      user: null,
+      initialized: true,
+      loading: false,
+    });
+  });
+
+  it("does not bounce when a user was present but we're already on /login", async () => {
+    window.history.replaceState(null, "", "/login");
+    useAuthStore.setState({
+      user: {
+        id: "user-1",
+        name: "관리자",
+        email: "admin@sen.ai",
+        role: "ADMIN",
+        facilityId: "facility-1",
+      },
+      initialized: true,
+      loading: true,
+      error: null,
+    });
+    const assign = vi.fn();
+    vi.stubGlobal("location", { ...window.location, pathname: "/login", assign });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn<typeof fetch>().mockResolvedValue(new Response("Unauthorized", { status: 401 }))
+    );
+
+    const { requestJson } = await import("@/services/apiClient");
+
+    await expect(requestJson("/protected")).rejects.toMatchObject({ status: 401 });
+
+    expect(assign).not.toHaveBeenCalled();
+  });
+
+  it("stays silent on a 401 after logout() already cleared the user (SSE session-invalid path, pinned)", async () => {
+    window.history.replaceState(null, "", "/facilities/facility-1/floor/floor-1");
+    authServiceMock.logout.mockResolvedValue(undefined);
+    useAuthStore.setState({
+      user: {
+        id: "user-1",
+        name: "관리자",
+        email: "admin@sen.ai",
+        role: "ADMIN",
+        facilityId: "facility-1",
+      },
+      initialized: true,
+      loading: false,
+      error: null,
+    });
+    await useAuthStore.getState().logout();
+    expect(useAuthStore.getState().user).toBeNull();
+
+    const assign = vi.fn();
+    vi.stubGlobal("location", {
+      ...window.location,
+      pathname: "/facilities/facility-1/floor/floor-1",
+      assign,
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn<typeof fetch>().mockResolvedValue(new Response("Unauthorized", { status: 401 }))
+    );
+
+    const { requestJson } = await import("@/services/apiClient");
+
+    await expect(requestJson("/protected")).rejects.toMatchObject({ status: 401 });
+
+    expect(assign).not.toHaveBeenCalled();
+    expect(useAuthStore.getState()).toMatchObject({
+      user: null,
+      initialized: true,
+      loading: false,
+    });
+  });
 });

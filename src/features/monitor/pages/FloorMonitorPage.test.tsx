@@ -1,5 +1,7 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { StaffLayout } from "@/components/layout/StaffLayout";
 import { FloorMonitorPage } from "./FloorMonitorPage";
 import { useAuthStore } from "@/stores/authStore";
 import { useFacilityStore } from "@/stores/facilityStore";
@@ -135,16 +137,177 @@ describe("FloorMonitorPage", () => {
     expect(shownSpaces.map((s) => (s as { id: string }).id)).not.toContain("space-hidden");
   });
 
+});
+
+describe("FloorMonitorPage — allView-keyed surface sizing", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useMonitorStore.setState({ dashboard: null, statuses: {}, loading: false });
+    useAuthStore.setState({
+      user: { id: "staff-1", name: "Care Staff", email: "staff@example.test", role: "STAFF", facilityId },
+      loading: false,
+      error: null,
+      initialized: true,
+    });
+    useFacilityStore.setState({ currentFacilityId: null });
+    useMonitorSettingsStore.setState({
+      defaultFloorId: "fl_2f",
+      refreshMs: 6000,
+      alertSound: false,
+      nightMode: false,
+      cardSize: "xl",
+      visibleSpaceIds: null,
+      allowAllView: true,
+    });
+    vi.mocked(dashboardService.getDashboard).mockResolvedValue({
+      facility: { id: facilityId, name: "행복요양원", address: "의정부시", phone: "031" },
+      floors: [{ id: "fl_2f", facilityId, name: "2F", orderIndex: 2, provisioningSource: "PRODUCT" }],
+      spaces: [],
+      statuses: {},
+      summary: { totalSpaces: 0, stable: 0, caution: 0, danger: 0, checkNeeded: 0, unacknowledged: 0 },
+      unacknowledgedEvents: [],
+    });
+  });
+
+  afterEach(() => {
+    Object.defineProperty(document, "fullscreenElement", {
+      configurable: true,
+      value: null,
+    });
+  });
+
+  it("regression: the guessed height cage (100dvh minus a fixed rem constant) and w-screen hack never come back", async () => {
+    render(<FloorMonitorPage />);
+
+    const surface = await screen.findByTestId("monitor-surface");
+    expect(surface.style.height).not.toContain("rem");
+    expect(surface.className).not.toContain("w-screen");
+    expect(surface.className).not.toContain("-translate-x-1/2");
+  });
+
+  it("overview (allView) has no inline height and no overflow/width-hack classes", async () => {
+    render(<FloorMonitorPage allView />);
+
+    const surface = await screen.findByTestId("monitor-surface");
+    expect(surface.style.height).toBe("");
+    expect(surface.className).not.toContain("overflow-hidden");
+    expect(surface.className).not.toContain("w-screen");
+    expect(surface.className).not.toContain("-translate-x-1/2");
+  });
+
+  it("places the actual StaffLayout Outlet root on the page-bleed grid track", async () => {
+    render(
+      <MemoryRouter initialEntries={["/facilities/fac_happy_nokyang/dashboard"]}>
+        <Routes>
+          <Route path="/facilities/:facilityId/dashboard" element={<StaffLayout />}>
+            <Route
+              index
+              element={(
+                <>
+                  <FloorMonitorPage allView />
+                  <div data-testid="route-grid-normal">normal StaffLayout content child</div>
+                </>
+              )}
+            />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    const surface = await screen.findByTestId("monitor-surface");
+    const monitorRoot = await screen.findByTestId("monitor-root");
+    const normalSibling = await screen.findByTestId("route-grid-normal");
+    const main = document.querySelector("main.page-grid");
+    expect(main).not.toBeNull();
+    expect(monitorRoot.parentElement).toBe(main);
+    expect(normalSibling.parentElement).toBe(main);
+    expect(monitorRoot.className).toContain("page-bleed");
+    expect(surface.className).not.toContain("page-bleed");
+  });
+
   it("toggles the dark-mode wrapper class with the nightMode setting", async () => {
-    const { container, rerender } = render(<FloorMonitorPage />);
+    render(<FloorMonitorPage />);
 
-    await waitFor(() => expect(roomStatusBoardMock).toHaveBeenCalled());
-    expect((container.firstChild as HTMLElement).className).toBe("");
+    const surface = await screen.findByTestId("monitor-surface");
+    const root = surface.parentElement;
+    expect(surface.className).toContain("overflow-hidden");
+    expect(root?.className).not.toContain("dark");
+    expect(root?.className).toContain("page-bleed");
+    expect(root?.className).toContain("h-full");
 
-    useMonitorSettingsStore.setState({ nightMode: true });
-    rerender(<FloorMonitorPage />);
+    act(() => {
+      useMonitorSettingsStore.getState().update({ nightMode: true });
+    });
 
-    await waitFor(() => expect((container.firstChild as HTMLElement).className).toContain("dark"));
+    await waitFor(() => expect(root?.className).toContain("dark"));
+    expect(root?.className).toContain("page-bleed");
+    expect(root?.className).toContain("h-full");
+    expect(surface.className).toContain("overflow-hidden");
+  });
+
+  it("passes the compact header contract only to the per-floor focus surface", async () => {
+    const { unmount } = render(<FloorMonitorPage />);
+    await screen.findByTestId("monitor-surface");
+    expect(monitorHeaderMock.mock.calls.at(-1)?.[0]).toMatchObject({ focus: true });
+    unmount();
+
+    render(<FloorMonitorPage allView />);
+    await screen.findByTestId("monitor-surface");
+    expect(monitorHeaderMock.mock.calls.at(-1)?.[0]).toMatchObject({ focus: false });
+  });
+
+  it("never renders the -translate-x-1/2 hack in either mode", async () => {
+    const { unmount } = render(<FloorMonitorPage allView />);
+    await screen.findByTestId("monitor-surface");
+    expect(document.querySelector('[class*="-translate-x-1/2"]')).toBeNull();
+    unmount();
+
+    render(<FloorMonitorPage />);
+    await screen.findByTestId("monitor-surface");
+    expect(document.querySelector('[class*="-translate-x-1/2"]')).toBeNull();
+  });
+
+  it("focus mode reads fullscreenchange to switch between h-full and 100dvh", async () => {
+    Object.defineProperty(document, "fullscreenElement", {
+      configurable: true,
+      value: null,
+    });
+
+    render(<FloorMonitorPage />);
+
+    const surface = await screen.findByTestId("monitor-surface");
+    expect(surface.style.height).toBe("");
+
+    Object.defineProperty(document, "fullscreenElement", {
+      configurable: true,
+      value: document.body,
+    });
+    await act(async () => {
+      document.dispatchEvent(new Event("fullscreenchange"));
+    });
+
+    expect(surface.style.height).toBe("100dvh");
+  });
+
+  it("overview mode ignores fullscreen and keeps no inline height", async () => {
+    Object.defineProperty(document, "fullscreenElement", {
+      configurable: true,
+      value: null,
+    });
+
+    render(<FloorMonitorPage allView />);
+
+    const surface = await screen.findByTestId("monitor-surface");
+
+    Object.defineProperty(document, "fullscreenElement", {
+      configurable: true,
+      value: document.body,
+    });
+    await act(async () => {
+      document.dispatchEvent(new Event("fullscreenchange"));
+    });
+
+    expect(surface.style.height).toBe("");
   });
 });
 

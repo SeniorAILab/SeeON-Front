@@ -169,6 +169,78 @@ describe("useDebouncedStatuses", () => {
     vi.useRealTimers();
   });
 });
+describe("RoomStatusBoard layout-aware containment (todo 6)", () => {
+  function boardProps() {
+    const selectedSpace = spaces[0];
+    return {
+      spaces: [selectedSpace],
+      statuses: { [selectedSpace.id]: status(selectedSpace.id, "STABLE") },
+      floors,
+      connection: "NORMAL" as const,
+      lastUpdateAt: null,
+    };
+  }
+
+  function innerSlot(container: HTMLElement): HTMLElement {
+    const section = container.querySelector('section[aria-label="방 상태 보드"]') as HTMLElement;
+    return section.children[1] as HTMLElement;
+  }
+
+  it("overview render has no overflow-hidden on the section or the inner slot", () => {
+    const { container } = render(<RoomStatusBoard {...boardProps()} layout="overview" />);
+    const section = container.querySelector('section[aria-label="방 상태 보드"]');
+    expect(section?.className).not.toContain("overflow-hidden");
+    expect(section?.className).not.toContain("h-full");
+    expect(section?.className).not.toContain("flex-1");
+    expect(section?.className).toContain("min-h-0");
+    const overflowScrollClasses = [
+      "overflow-auto",
+      "overflow-scroll",
+      "overflow-x-auto",
+      "overflow-y-auto",
+      "overflow-x-scroll",
+      "overflow-y-scroll",
+    ];
+    for (const className of overflowScrollClasses) {
+      expect(section?.className).not.toContain(className);
+    }
+
+    const slot = innerSlot(container);
+    expect(slot.className).not.toContain("overflow-hidden");
+    for (const className of overflowScrollClasses) {
+      expect(slot.className).not.toContain(className);
+    }
+    expect(slot.className).not.toContain("flex-1");
+    expect(slot.className).toContain("min-h-0");
+  });
+
+  it("focus render keeps overflow-hidden on both the section and the inner slot", () => {
+    const { container } = render(<RoomStatusBoard {...boardProps()} layout="focus" />);
+    const section = container.querySelector('section[aria-label="방 상태 보드"]');
+    expect(section?.className).toContain("overflow-hidden");
+    expect(section?.className).toContain("h-full");
+    expect(section?.className).toContain("flex-1");
+    expect(section?.className).toContain("min-h-0");
+
+    const slot = innerSlot(container);
+    expect(slot.className).toContain("overflow-hidden");
+    expect(slot.className).toContain("flex-1");
+    expect(slot.className).toContain("min-h-0");
+  });
+
+  it("rendering with NO layout prop behaves as overview (the admin dashboard path)", () => {
+    const { container } = render(<RoomStatusBoard {...boardProps()} />);
+    const section = container.querySelector('section[aria-label="방 상태 보드"]');
+    expect(section?.className).not.toContain("overflow-hidden");
+    expect(section?.className).not.toContain("h-full");
+    expect(section?.className).not.toContain("flex-1");
+
+    const slot = innerSlot(container);
+    expect(slot.className).not.toContain("overflow-hidden");
+    expect(slot.className).not.toContain("flex-1");
+  });
+});
+
 describe("RoomStatusBoard card size", () => {
   it("applies card size to room tiles without resizing action-panel controls", () => {
     const selectedSpace = spaces[0];

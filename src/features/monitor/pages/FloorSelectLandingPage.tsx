@@ -73,7 +73,7 @@ export function FloorSelectLandingPage() {
 
   if (error) {
     return (
-      <div className="relative left-1/2 flex min-h-[calc(100dvh-9.5rem)] w-screen -translate-x-1/2 flex-col items-center justify-center gap-4 px-4 text-center">
+      <div className="page-bleed flex flex-col items-center justify-center gap-4 px-4 text-center">
         <p className="text-staff-body font-bold text-status-danger">층 정보를 불러오지 못했습니다.</p>
         <button
           type="button"
@@ -87,11 +87,11 @@ export function FloorSelectLandingPage() {
   }
 
   if (loading || !dashboard) {
-    return <div className="relative left-1/2 flex min-h-[calc(100dvh-9.5rem)] w-screen -translate-x-1/2 items-center justify-center px-4 text-xl font-bold text-ink-soft">층 선택 화면을 준비하는 중...</div>;
+    return <div className="page-bleed flex items-center justify-center px-4 text-xl font-bold text-ink-soft">층 선택 화면을 준비하는 중...</div>;
   }
 
   return (
-    <section className="relative left-1/2 flex min-h-[calc(100dvh-9.5rem)] w-screen -translate-x-1/2 flex-col gap-4 px-4 pb-4" aria-labelledby="floor-select-title">
+    <section className="page-bleed flex flex-col gap-4 px-4 pb-4" aria-labelledby="floor-select-title">
       <div className="rounded-3xl border border-border bg-surface p-5 shadow-sm 2xl:p-6">
         <p className="text-staff-body font-bold text-ink-soft">{dashboard.facility.name}</p>
         <h1 id="floor-select-title" className="mt-2 text-staff-name font-black text-ink">

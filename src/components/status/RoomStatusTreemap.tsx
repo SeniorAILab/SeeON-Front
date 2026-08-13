@@ -81,7 +81,13 @@ export function groupRoomsByFloor(spaces: Space[], statuses: Record<string, Spac
 
   const groups = floors
     .filter((floor) => knownGroups.has(floor.id))
-    .map((floor) => toGroup(floor.id, knownGroups.get(floor.id)!, floor));
+    .map((floor) => toGroup(floor.id, knownGroups.get(floor.id)!, floor))
+    .sort((a, b) => {
+      const riskA = a.alertCount > 0 ? 1 : 0;
+      const riskB = b.alertCount > 0 ? 1 : 0;
+      if (riskA !== riskB) return riskB - riskA;
+      return (a.floor?.orderIndex ?? 0) - (b.floor?.orderIndex ?? 0) || a.floorName.localeCompare(b.floorName, "ko", { numeric: true, sensitivity: "base" });
+    });
 
   const unknown = [...unknownGroups.entries()]
     .sort(([a], [b]) => a.localeCompare(b, "ko", { numeric: true, sensitivity: "base" }))
@@ -115,7 +121,7 @@ export function RoomStatusTreemap({
 
   return (
     <div
-      className={layout === "focus" ? "flex h-full w-full flex-col gap-4 overflow-hidden" : "flex h-full w-full flex-col gap-4 overflow-auto pr-1"}
+      className={layout === "focus" ? "flex h-full w-full flex-col gap-4 overflow-hidden" : "flex w-full flex-col gap-4"}
       role="list"
       aria-label="방 상태 히트맵"
     >

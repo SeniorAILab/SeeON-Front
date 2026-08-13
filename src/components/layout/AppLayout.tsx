@@ -219,7 +219,9 @@ export function AppLayout() {
         </header>
 
         <main className="flex-1 p-4 lg:p-6">
-          <Outlet />
+          <div className="mx-auto w-full max-w-6xl">
+            <Outlet />
+          </div>
         </main>
       </div>
     </div>

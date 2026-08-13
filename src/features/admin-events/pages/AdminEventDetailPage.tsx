@@ -2,12 +2,11 @@ import { useEffect, useState } from "react";
 import { apiErrorMessage } from "@/services/apiClient";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Film } from "lucide-react";
-import { Card, Button, Textarea } from "@/components/ui/primitives";
+import { Card, Button } from "@/components/ui/primitives";
 import { RiskBadge } from "@/components/RiskBadge";
 import { AlertStatusBadge } from "@/components/AlertStatusBadge";
 import { AIInsightBox } from "@/features/admin-events/components/AIInsightBox";
 import { EventTimeline } from "@/features/admin-events/components/EventTimeline";
-import { ActionLogForm } from "@/features/admin-events/components/ActionLogForm";
 import { AlertEvidencePanel } from "@/features/admin-events/components/video/AlertEvidencePanel";
 import { VideoPermissionGuard } from "@/features/admin-events/components/video/VideoPermissionGuard";
 import { VideoAccessNotice } from "@/features/admin-events/components/video/VideoAccessNotice";
@@ -19,7 +18,6 @@ import { canAcknowledge } from "@/lib/roles";
 import { formatDateTime } from "@/lib/format";
 import { displayEventTypeLabel, alertLabel } from "@/lib/labels";
 import type {
-  ActionType,
   DetectionEvent,
   Floor,
   Level,
@@ -42,21 +40,16 @@ export function AdminEventDetailPage() {
   const [timeline, setTimeline] = useState<DetectionEvent[]>([]);
   const [space, setSpace] = useState<Space | null>(null);
   const [floor, setFloor] = useState<Floor | null>(null);
-  const [memo, setMemo] = useState("");
-  const [memoSaving, setMemoSaving] = useState(false);
-  // 조치/메모 저장 실패 사유. catch가 없으면 실패해도 화면이 조용해서
-  // 관리자가 저장됐다고 믿는다.
+  const [acknowledging, setAcknowledging] = useState(false);
+  // 확인 완료 실패 사유. catch가 없으면 실패해도 화면이 조용해서
+  // 관리자가 처리됐다고 믿는다.
   const [actionError, setActionError] = useState<string | null>(null);
 
   async function loadEvent() {
     if (!eventId) return;
     const ev = await eventService.getById(eventId);
     setEvent(ev ?? null);
-    if (ev?.testMode === "SYSTEM_TEST") {
-      setSpace(null);
-      setFloor(null);
-      setTimeline([]);
-    } else if (ev) {
+    if (ev) {
       const dashboard = await dashboardService.getDashboard(ev.facilityId);
       const matchedSpace = dashboard.spaces.find((s) => s.id === ev.spaceId) ?? null;
       setSpace(matchedSpace);
@@ -87,72 +80,24 @@ export function AdminEventDetailPage() {
   const acked = event.alertStatus === "ACKNOWLEDGED";
   const eventClipsEnabled = isEventClipsEnabled();
 
-  async function handleAction(type: ActionType, note: string) {
+  async function handleAcknowledge() {
     if (!user || !event) return;
     setActionError(null);
+    setAcknowledging(true);
     try {
-      await eventService.addAction(event.id, type, note || undefined, user.name);
+      await eventService.acknowledge(event.id, user.name);
       await loadEvent();
     } catch (caught) {
       // 서버가 거부해도 조용히 넘어가면 관리자는 처리됐다고 믿는다.
       setActionError(
         apiErrorMessage(caught, "조치를 저장하지 못했습니다. 다시 시도해 주세요."),
       );
-      // 다시 던져야 ActionLogForm이 입력한 메모를 지우지 않는다. 삼키면
-      // 실패했는데 작성 내용까지 사라져 처음부터 다시 써야 한다.
-      throw caught;
-    }
-  }
-
-  async function handleMemoSave() {
-    if (!event || memo.trim().length === 0) return;
-    setMemoSaving(true);
-    setActionError(null);
-    try {
-      await eventService.addAction(event.id, "MEMO", memo.trim(), user?.name ?? "관리자");
-      setMemo("");
-      await loadEvent();
-    } catch (caught) {
-      setActionError(
-        apiErrorMessage(caught, "메모를 저장하지 못했습니다. 다시 시도해 주세요."),
-      );
     } finally {
-      setMemoSaving(false);
+      setAcknowledging(false);
     }
   }
 
-  const adminNotes = event.actions.filter((action) => "authorRole" in action && action.authorRole === "ADMIN");
-  const staffNotes = event.actions.filter((action) => !("authorRole" in action) || action.authorRole === "STAFF");
 
-  if (event.testMode === "SYSTEM_TEST") {
-    return (
-      <div className="mx-auto max-w-3xl space-y-5">
-        <button
-          onClick={() => navigate(-1)}
-          className="inline-flex items-center gap-1.5 text-sm text-ink-soft hover:text-ink"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          이벤트 목록
-        </button>
-        <Card
-          data-alert-id={event.id}
-          data-backend-event-id={event.backendEventId ?? undefined}
-          data-correlation-id={event.backendEventId ?? event.id}
-          data-test-mode="SYSTEM_TEST"
-          data-status="SYSTEM_TEST"
-          className="border-2 border-dashed border-ink-faint bg-surface2 p-5"
-        >
-          <h1 className="text-xl font-black tracking-wide text-ink">SYSTEM TEST</h1>
-          <p className="mt-2 text-sm font-bold text-ink-soft">{event.label}</p>
-          <p className="mt-2 text-sm text-ink-faint">{formatDateTime(event.detectedAt)}</p>
-          <div className="mt-4 flex items-center gap-2">
-            <AlertStatusBadge status={event.alertStatus} />
-            <span className="text-xs text-ink-faint">{alertLabel[event.alertStatus]}</span>
-          </div>
-        </Card>
-      </div>
-    );
-  }
 
   return (
     <div className="mx-auto max-w-3xl space-y-5">
@@ -228,50 +173,15 @@ export function AdminEventDetailPage() {
         <EventTimeline events={timeline.slice(0, 10)} />
       </Card>
 
-      {/* 관리자 판단 메모 */}
+      {/* 확인 완료 처리 */}
       <Card className="p-5">
-        <h2 className="mb-2 text-base font-semibold text-ink">관리자 판단 메모</h2>
-        <Textarea
-          rows={3}
-          value={memo}
-          placeholder="사고 판단/조치 근거를 기록하세요."
-          onChange={(e) => setMemo(e.target.value)}
-        />
-        <div className="mt-2 flex flex-wrap items-center gap-3">
-          <Button size="sm" onClick={handleMemoSave} disabled={memoSaving || memo.trim().length === 0}>
-            {memoSaving ? "저장 중..." : "메모 저장"}
-          </Button>
-        </div>
-        {adminNotes.length > 0 && (
-          <ul className="mt-4 space-y-2">
-            {adminNotes.map((a) => (
-              <li key={a.id} className="rounded-lg bg-surface2 px-3 py-2 text-sm">
-                <span className="font-medium text-ink">{a.createdBy}</span>
-                <span className="text-ink-faint"> · {formatDateTime(a.createdAt)}</span>
-                {a.note && <p className="mt-0.5 text-ink-soft">{a.note}</p>}
-              </li>
-            ))}
-          </ul>
-        )}
-      </Card>
-
-      {/* 요양보호사 메모 */}
-      <Card className="p-5">
-        <h2 className="mb-3 text-base font-semibold text-ink">요양보호사 메모</h2>
-        {staffNotes.length > 0 ? (
-          <ul className="mb-4 space-y-2">
-            {staffNotes.map((a) => (
-              <li key={a.id} className="rounded-lg bg-surface2 px-3 py-2 text-sm">
-                <span className="font-medium text-ink">{a.createdBy}</span>
-                <span className="text-ink-faint"> · {formatDateTime(a.createdAt)}</span>
-                {a.note && <p className="mt-0.5 text-ink-soft">{a.note}</p>}
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="mb-4 text-sm text-ink-faint">아직 요양보호사 메모가 없습니다.</p>
-        )}
-        <ActionLogForm onSubmit={handleAction} disabled={!canAcknowledge(user)} />
+        <h2 className="mb-3 text-base font-semibold text-ink">확인 완료 처리</h2>
+        <Button
+          onClick={handleAcknowledge}
+          disabled={!canAcknowledge(user) || acked || acknowledging}
+        >
+          {acknowledging ? "처리 중..." : "확인 완료"}
+        </Button>
         {actionError && (
           <p role="alert" className="mt-3 rounded-lg bg-status-dangerBg px-3 py-2 text-sm font-semibold text-status-danger">
             {actionError}
@@ -285,7 +195,7 @@ export function AdminEventDetailPage() {
           <AlertStatusBadge status={event.alertStatus} />
           <span className="text-xs text-ink-faint">{alertLabel[event.alertStatus]}</span>
         </div>
-        <p className="text-sm text-ink-faint">알림 처리 내역은 위의 타임라인과 메모에서 확인할 수 있습니다.</p>
+        <p className="text-sm text-ink-faint">알림 처리 내역은 위의 타임라인에서 확인할 수 있습니다.</p>
       </Card>
     </div>
   );

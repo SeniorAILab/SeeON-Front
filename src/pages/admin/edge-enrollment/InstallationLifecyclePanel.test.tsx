@@ -2,8 +2,6 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
-  createEdgeValidationRun,
-  listEdgeValidationEvents,
   replaceEdgeInstallation,
   transferEdgeOwnership,
 } from "@/services/api/edgeInstallationAdmin";
@@ -11,20 +9,15 @@ import { OneTimeCredential } from "@/services/api/edgeEnrollmentTypes";
 import { InstallationLifecyclePanel } from "./InstallationLifecyclePanel";
 
 vi.mock("@/services/api/edgeInstallationAdmin", () => ({
-  createEdgeValidationRun: vi.fn(),
-  listEdgeValidationEvents: vi.fn(),
   replaceEdgeInstallation: vi.fn(),
   transferEdgeOwnership: vi.fn(),
 }));
 
-const createValidationMock = vi.mocked(createEdgeValidationRun);
-const listValidationEventsMock = vi.mocked(listEdgeValidationEvents);
 const replaceMock = vi.mocked(replaceEdgeInstallation);
 const transferMock = vi.mocked(transferEdgeOwnership);
 const INSTALLATION_ID = "c72bd9a7-3e04-47ba-a8cd-a56e54f98152";
 const CLIENT_REF = "8b0f5ba2-d359-4d8e-948f-e386ac40c347";
 const OPERATION_ID = "0197f671-3a31-7a6c-a6e4-83ed412de801";
-const VALIDATION_RUN_ID = "0197f671-3a31-7a6c-a6e4-83ed412de802";
 const MANIFEST_DIGEST = "a".repeat(64);
 
 function renderPanel(onCredential = vi.fn()) {
@@ -71,31 +64,6 @@ describe("InstallationLifecyclePanel", () => {
     const handoff = onCredential.mock.calls.at(0);
     expect(handoff?.[0]).toBe(holder);
     expect(handoff?.[1]).toBe("설치 교체 자격");
-  });
-
-  it("runs a time-limited validation and reports only the event count", async () => {
-    createValidationMock.mockResolvedValue({
-      operation: {
-        operationId: OPERATION_ID,
-        status: "SUCCEEDED",
-        createdAt: "2026-01-01T00:00:00.000Z",
-        updatedAt: "2026-01-01T00:00:00.000Z",
-      },
-      validationRunId: VALIDATION_RUN_ID,
-      edgeInstallationId: INSTALLATION_ID,
-      enrollmentGeneration: 2,
-      status: "ACTIVE",
-      createdAt: "2026-01-01T00:00:00.000Z",
-      expiresAt: "2026-01-01T00:15:00.000Z",
-    });
-    listValidationEventsMock.mockResolvedValue([
-      { id: CLIENT_REF, detectedAt: "2026-01-01T00:02:00.000Z" },
-    ]);
-    renderPanel();
-
-    fireEvent.click(screen.getByRole("button", { name: "검증 실행" }));
-    expect(await screen.findByText("검증 이벤트 1건")).toBeTruthy();
-    expect(document.body.textContent).not.toContain(CLIENT_REF);
   });
 
   it("validates and confirms an ownership-transfer manifest", async () => {

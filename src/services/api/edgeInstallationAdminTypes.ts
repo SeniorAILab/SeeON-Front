@@ -23,21 +23,6 @@ export type ReplacedEdgeInstallation =
       readonly replacementPrefix: string;
     });
 
-export type EdgeValidationRun = {
-  readonly operation: EdgeOperationSummary;
-  readonly validationRunId: string;
-  readonly edgeInstallationId: string;
-  readonly enrollmentGeneration: number;
-  readonly status: "ACTIVE";
-  readonly createdAt: string;
-  readonly expiresAt: string;
-};
-
-export type EdgeValidationEventSummary = {
-  readonly id: string;
-  readonly detectedAt: string;
-};
-
 export type OwnershipTransferManifestItem = {
   readonly kind: OwnershipTransferKind;
   readonly edgeRef: string;

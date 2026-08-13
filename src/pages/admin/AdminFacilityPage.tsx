@@ -75,7 +75,7 @@ export function AdminFacilityPage() {
   if (!facility) return <p className="text-sm text-gray-400">불러오는 중...</p>;
 
   return (
-    <div className="max-w-2xl space-y-5">
+    <div className="mx-auto max-w-2xl space-y-5">
       <PageHeader title="시설 정보" description="시설 기본 정보를 수정합니다." />
       {error && <p className="rounded-lg bg-status-dangerBg px-3 py-2 text-sm text-status-danger">{error}</p>}
       <Card className="p-6">

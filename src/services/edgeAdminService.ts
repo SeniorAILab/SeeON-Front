@@ -6,8 +6,6 @@ export {
   rotateEdgeCredential,
 } from "./api/edgeEnrollments";
 export {
-  createEdgeValidationRun,
-  listEdgeValidationEvents,
   replaceEdgeInstallation,
   transferEdgeOwnership,
 } from "./api/edgeInstallationAdmin";

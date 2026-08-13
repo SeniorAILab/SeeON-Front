@@ -6,33 +6,20 @@ import { playTTS, cancelTTS } from "./playTTS";
 import type { TTSFailureReason } from "./ttsProvider";
 import { textFor } from "./audioMap";
 import type { AudioLevel } from "./ttsConfig";
-import { SYSTEM_TEST_TTS_TEXT, type SystemTestMode } from "@/types";
 
 export type TTSLevel = "EMERGENCY" | "DANGER" | "CAUTION";
 
-interface TTSAlertBase {
+export interface TTSAlertInput {
   identity: string;
-  level: TTSLevel;
-  reason: string;
-}
-
-export interface TTSIncidentAlertInput extends TTSAlertBase {
   kind: "INCIDENT";
   spaceId: string;
   name: string;
+  level: TTSLevel;
+  reason: string;
   floorName: string;
 }
 
-export interface TTSSystemTestAlertInput extends TTSAlertBase {
-  kind: "SYSTEM_TEST";
-  spaceId: null;
-  name: null;
-  floorName: null;
-  testMode: SystemTestMode;
-  ttsText: typeof SYSTEM_TEST_TTS_TEXT;
-}
-
-export type TTSAlertInput = TTSIncidentAlertInput | TTSSystemTestAlertInput;
+export type TTSIncidentAlertInput = TTSAlertInput;
 
 const PRIORITY: Record<TTSLevel, number> = { EMERGENCY: 0, DANGER: 1, CAUTION: 2 };
 const AUDIO_LEVEL: Record<TTSLevel, AudioLevel> = {
@@ -49,8 +36,9 @@ type Item = TTSAlertInput & {
 };
 interface Utterance {
   identity: string;
+  firstAnnouncement: boolean;
   priority: number;
-  ordinal: number;
+  seq: number;
   text: string;
 }
 
@@ -61,7 +49,7 @@ export class TTSManager {
   private speakingIdentity: string | null = null;
   private enabled = false;
   private timer: ReturnType<typeof setInterval> | null = null;
-  private nextOrdinal = 0;
+  private nextSeq = 0;
   private playbackGeneration = 0;
 
   private ensureTimer() {
@@ -94,10 +82,29 @@ export class TTSManager {
         }
       } else if (PRIORITY[alert.level] < PRIORITY[current.level]) {
         this.items.set(alert.identity, { ...alert, announces: 0, nextAt: now });
+        // A stale queued (not yet drained) reannouncement utterance for this
+        // identity would otherwise block tick() from re-enqueueing it at the
+        // upgraded severity/text/first-announcement cohort.
+        this.queue = this.queue.filter((utterance) => utterance.identity !== alert.identity);
       } else {
         Object.assign(current, alert);
       }
     }
+  }
+
+  /**
+   * Retries active alerts from a real browser user gesture after autoplay
+   * blocked speech. This intentionally drains synchronously so speak() stays
+   * in the gesture's call stack.
+   */
+  retryPendingOnUserGesture() {
+    if (!this.enabled) return;
+
+    const now = Date.now();
+    for (const item of this.items.values()) {
+      if (item.identity !== this.speakingIdentity) item.nextAt = now;
+    }
+    this.tick();
   }
 
   private tick() {
@@ -110,15 +117,21 @@ export class TTSManager {
     for (const item of due) {
       const alreadyQueued = this.queue.some((utterance) => utterance.identity === item.identity);
       if (alreadyQueued || this.speakingIdentity === item.identity) continue;
+      // Capture the cohort before incrementing: first announcements cannot be
+      // starved by reannouncements from already-spoken active incidents.
+      const firstAnnouncement = item.announces === 0;
       this.queue.push({
         identity: item.identity,
+        firstAnnouncement,
         priority: PRIORITY[item.level],
-        ordinal: this.nextOrdinal++,
-        text: item.kind === "SYSTEM_TEST"
-          ? item.ttsText
-          : textFor(item.name, AUDIO_LEVEL[item.level]),
+        seq: this.nextSeq++,
+        text: textFor(item.name, AUDIO_LEVEL[item.level]),
       });
-      this.queue.sort((a, b) => a.priority - b.priority || a.ordinal - b.ordinal);
+      this.queue.sort((a, b) =>
+        (a.firstAnnouncement === b.firstAnnouncement ? 0 : a.firstAnnouncement ? -1 : 1) ||
+        a.priority - b.priority ||
+        a.seq - b.seq
+      );
       const delay = REANNOUNCE_MS[Math.min(item.announces, REANNOUNCE_MS.length - 1)];
       item.announces += 1;
       item.nextAt = now + delay;
@@ -163,6 +176,13 @@ export class TTSManager {
 }
 
 export const ttsManager = new TTSManager();
+
+/** Scripted events must not acquire browser audio permission. */
+export function retryPendingTTSFromTrustedInteraction(event: Pick<Event, "isTrusted">): boolean {
+  if (!event.isTrusted) return false;
+  ttsManager.retryPendingOnUserGesture();
+  return true;
+}
 
 let failureReason: TTSFailureReason | null = null;
 const failureListeners = new Set<(reason: TTSFailureReason | null) => void>();

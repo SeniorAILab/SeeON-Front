@@ -34,7 +34,6 @@ function alert(overrides: Partial<FrontendAlert> = {}): FrontendAlert {
     aiSummary: "침상 이탈이 감지되었습니다.",
     detectedAt: "2026-06-22T00:00:00.000Z",
     alertStatus: "PENDING",
-    actions: [],
     confidence: 0.91,
     emergency: true,
     backendStatus: "NEW",
@@ -173,31 +172,6 @@ describe("alertMerge", () => {
       scopedDuring.id,
     ]);
     expect(alertsForFacility(state, otherFacilityId)).toEqual([other]);
-  });
-
-  it("keeps SYSTEM_TEST active and visible without deriving a room danger status", () => {
-    const system = alert({
-      id: "alert-system-merge",
-      backendEventId: "event-system-merge",
-      alertSeq: "3",
-      spaceId: null,
-      room: undefined,
-      cameraId: null,
-      eventType: "SYSTEM_TEST",
-      riskLevel: "LOW",
-      emergency: false,
-      backendType: "SYSTEM_TEST",
-      testMode: "SYSTEM_TEST",
-      label: "SYSTEM TEST - NOT A RESIDENT ALERT",
-      ttsText: "System test emergency notification",
-    } as unknown as Partial<FrontendAlert>);
-
-    const merged = mergeAlertsIntoDashboard(dashboard(), [system]);
-
-    expect(isActiveAlert(system)).toBe(true);
-    expect(merged.unacknowledgedEvents).toEqual([system]);
-    expect(merged.statuses).toEqual({});
-    expect(merged.summary).toMatchObject({ danger: 0, checkNeeded: 0, unacknowledged: 1 });
   });
 
   it("test_alert_seq_comparison_is_numeric_not_lexicographic", () => {

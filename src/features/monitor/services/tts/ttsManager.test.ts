@@ -1,10 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { playTTS } from "./playTTS";
-import {
-  TTSManager,
-  type TTSAlertInput,
-  type TTSIncidentAlertInput,
-} from "./ttsManager";
+import { TTSManager, type TTSIncidentAlertInput } from "./ttsManager";
 
 vi.mock("./playTTS", () => ({
   playTTS: vi.fn(() => Promise.resolve({ ok: true })),
@@ -37,20 +33,6 @@ function incident(
   };
 }
 
-function systemTest(identity: string): TTSAlertInput {
-  return {
-    identity,
-    kind: "SYSTEM_TEST",
-    spaceId: null,
-    name: null,
-    level: "CAUTION",
-    reason: "",
-    floorName: null,
-    testMode: "SYSTEM_TEST",
-    ttsText: "System test emergency notification",
-  } as TTSAlertInput;
-}
-
 describe("TTSManager event identity", () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -61,6 +43,24 @@ describe("TTSManager event identity", () => {
   afterEach(() => {
     vi.clearAllTimers();
     vi.useRealTimers();
+  });
+
+  it("retries an active due alert immediately from a user gesture when enabled", () => {
+    const manager = new TTSManager();
+
+    manager.update([incident("event-gesture-retry")], true);
+    manager.retryPendingOnUserGesture();
+
+    expect(playTTSMock).toHaveBeenCalledWith("101호에서 위험 발생, 확인이 필요합니다");
+  });
+
+  it("does not retry pending alerts from a user gesture when disabled", () => {
+    const manager = new TTSManager();
+
+    manager.update([incident("event-disabled-gesture-retry")], false);
+    manager.retryPendingOnUserGesture();
+
+    expect(playTTSMock).not.toHaveBeenCalled();
   });
 
   it("does not speak the same event again after replay, removal, and reconnect", async () => {
@@ -90,16 +90,6 @@ describe("TTSManager event identity", () => {
       "101호에서 응급 발생, 확인이 필요합니다",
       "101호에서 위험 발생, 확인이 필요합니다",
     ]);
-  });
-
-  it("speaks the fixed SYSTEM_TEST payload and never a room emergency phrase", async () => {
-    const manager = new TTSManager();
-
-    manager.update([systemTest("event-system-test-tts")], true);
-    await vi.advanceTimersByTimeAsync(1_000);
-
-    expect(playTTSMock).toHaveBeenCalledWith("System test emergency notification");
-    expect(playTTSMock.mock.calls[0]?.[0]).not.toContain("101호");
   });
 
   it("does not let a cancelled playback completion drain a replacement queue concurrently", async () => {

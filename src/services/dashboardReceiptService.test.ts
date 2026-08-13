@@ -24,7 +24,6 @@ function alert(id: string, backendEventId: string | null = `event-${id}`): Detec
     aiSummary: "침상 이탈이 감지되었습니다.",
     detectedAt: "2026-07-17T03:00:00.000Z",
     alertStatus: "PENDING",
-    actions: [],
   };
 }
 

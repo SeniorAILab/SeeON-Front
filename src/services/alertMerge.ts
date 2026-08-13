@@ -1,7 +1,7 @@
 import type { DashboardResponse, SpaceStatus } from "@/types";
 import type { FrontendAlert } from "@/services/api/alertEndpoints";
 
-const ACTIVE_BACKEND_TYPES = new Set(["fall", "bed-exit", "SYSTEM_TEST"]);
+const ACTIVE_BACKEND_TYPES = new Set(["fall", "bed-exit"]);
 const RESOLVED_STATUS = "RESOLVED";
 /** 요양보호사가 확인했지만 아직 해결되지 않은 상태(I4로 분리됨). */
 const ACKED_STATUS = "ACKED";
@@ -9,7 +9,7 @@ const ACKED_STATUS = "ACKED";
 export interface AlertUpdateDelta {
   id: string;
   alertSeq: string | number;
-  spaceId: string | null;
+  spaceId: string;
   status: string;
   resolvedById?: string | null;
   resolvedAt?: string | null;
@@ -241,13 +241,7 @@ function mapBackendStatusToAlertStatus(status: string): FrontendAlert["alertStat
   return "PENDING";
 }
 
-type SpaceAlert = FrontendAlert & { spaceId: string };
-
-function hasSpace(alert: FrontendAlert): alert is SpaceAlert {
-  return typeof alert.spaceId === "string" && alert.spaceId.length > 0;
-}
-
-function statusFromAlert(previous: SpaceStatus | undefined, alert: SpaceAlert): SpaceStatus {
+function statusFromAlert(previous: SpaceStatus | undefined, alert: FrontendAlert): SpaceStatus {
   return {
     id: previous?.id ?? `status-${alert.spaceId}`,
     spaceId: alert.spaceId,
@@ -282,7 +276,7 @@ function stableClearedStatus(status: SpaceStatus): SpaceStatus {
   };
 }
 
-function normalStatusFromAlert(previous: SpaceStatus | undefined, alert: SpaceAlert): SpaceStatus {
+function normalStatusFromAlert(previous: SpaceStatus | undefined, alert: FrontendAlert): SpaceStatus {
   return stableClearedStatus({
     id: previous?.id ?? `status-${alert.spaceId}`,
     spaceId: alert.spaceId,
@@ -308,9 +302,8 @@ export function deriveStatusesFromAlerts(
   baseStatuses: Record<string, SpaceStatus>,
   alerts: FrontendAlert[]
 ): Record<string, SpaceStatus> {
-  const alertsBySpace: Record<string, SpaceAlert[]> = {};
+  const alertsBySpace: Record<string, FrontendAlert[]> = {};
   for (const alert of alerts) {
-    if (!hasSpace(alert)) continue;
     alertsBySpace[alert.spaceId] = [...(alertsBySpace[alert.spaceId] ?? []), alert];
   }
 

@@ -150,4 +150,28 @@ describe("AppLayout facility selector", () => {
 
     expect(accountActions?.classList.contains("justify-end")).toBe(true);
   });
+
+  it("centers the outlet content in a max-width container", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn<typeof fetch>().mockResolvedValue(okJsonResponse([nokyangFacility])),
+    );
+
+    const { container } = render(
+      <MemoryRouter initialEntries={["/admin"]}>
+        <Routes>
+          <Route path="/admin" element={<AppLayout />}>
+            <Route index element={<div>Admin child</div>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await screen.findByRole("combobox");
+    const outletContent = await screen.findByText("Admin child");
+    const centeredContainer = container.querySelector(".mx-auto.w-full.max-w-6xl");
+
+    expect(centeredContainer).not.toBeNull();
+    expect(centeredContainer?.contains(outletContent)).toBe(true);
+  });
 });

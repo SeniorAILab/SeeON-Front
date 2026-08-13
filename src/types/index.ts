@@ -55,13 +55,7 @@ export type AlertLifecycleStatus =
   | "ACKNOWLEDGED" // 직원 확인 완료
   | "FAILED"; // 발송 실패
 
-export const SYSTEM_TEST_MODE = "SYSTEM_TEST" as const;
-export const SYSTEM_TEST_LABEL = "SYSTEM TEST - NOT A RESIDENT ALERT" as const;
-export const SYSTEM_TEST_TTS_TEXT = "System test emergency notification" as const;
-export type SystemTestMode = typeof SYSTEM_TEST_MODE;
-
 export type DetectionEventType =
-  | "SYSTEM_TEST"
   | "STABLE"
   | "MOVEMENT_INCREASE"
   | "REPEATED_STANDING_ATTEMPT"
@@ -71,15 +65,6 @@ export type DetectionEventType =
   | "WANDERING"
   | "BED_EXIT"
   | "OTHER";
-
-export type ActionType =
-  | "ACKNOWLEDGED" // 확인 완료
-  | "STAFF_VISIT" // 직원 방문 중
-  | "HELP_REQUEST" // 도움 요청
-  | "NO_ISSUE" // 이상 없음
-  | "GUARDIAN_CONTACT" // 보호자 연락
-  | "HOSPITAL_TRANSFER" // 병원 이송
-  | "MEMO"; // 기타 메모
 
 // ---------- 엔티티 ----------
 
@@ -153,15 +138,12 @@ export interface DetectionEvent {
   id: string;
   backendEventId?: string | null;
   facilityId: string;
-  spaceId: string | null;
+  spaceId: string;
   alertSeq?: string; // backend causal sequence for dashboard-stream merge
   residentId?: string | null; // null = room/space-level alert
   cameraId?: string | null;
   room?: string;
   eventType: DetectionEventType;
-  testMode?: SystemTestMode;
-  label?: typeof SYSTEM_TEST_LABEL;
-  ttsText?: typeof SYSTEM_TEST_TTS_TEXT;
   riskLevel: Level;
   message: string;
   aiSummary: string;
@@ -169,18 +151,10 @@ export interface DetectionEvent {
   alertStatus: AlertLifecycleStatus;
   acknowledgedBy?: string;
   acknowledgedAt?: string;
-  actions: ActionLog[];
   confidence?: number; // AI 모델 신뢰도 (0~1)
   emergency?: boolean; // 응급 이벤트
 }
 
-export interface ActionLog {
-  id: string;
-  type: ActionType;
-  note?: string;
-  createdBy: string;
-  createdAt: string;
-}
 
 export interface AlertRule {
   id: string;
@@ -256,13 +230,10 @@ export interface AlertView {
   facilityId: string;
   residentId: string | null;
   cameraId: string | null;
-  spaceId: string | null;
-  room: string | null;
+  spaceId: string;
+  room: string;
   type: string;
-  testMode?: SystemTestMode;
-  label?: typeof SYSTEM_TEST_LABEL;
-  ttsText?: typeof SYSTEM_TEST_TTS_TEXT;
-  probability: number | null;
+  probability: number;
   snapshotKey: string | null;
   detectedAt: string;
   status: AlertStatus;

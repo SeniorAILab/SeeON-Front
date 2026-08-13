@@ -1,9 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { displayEventTypeLabel, eventPresentationFor, eventTypeLabel } from "./labels";
+import { detectionEventPresentationFor, displayEventTypeLabel, eventPresentationFor, eventTypeLabel } from "./labels";
 import type { DetectionEventType } from "@/types";
 
 const knownEventTypes: Record<DetectionEventType, string> = {
-  SYSTEM_TEST: "SYSTEM TEST",
   STABLE: "안정 상태",
   MOVEMENT_INCREASE: "움직임 증가",
   REPEATED_STANDING_ATTEMPT: "반복 기립 시도",
@@ -54,6 +53,57 @@ describe("eventTypeLabel", () => {
   });
 });
 
+describe("detectionEventPresentationFor", () => {
+  const allEventTypes: DetectionEventType[] = [
+    "STABLE",
+    "MOVEMENT_INCREASE",
+    "REPEATED_STANDING_ATTEMPT",
+    "FALL_RISK",
+    "SOLO_MOVEMENT",
+    "PROLONGED_INACTIVITY",
+    "WANDERING",
+    "BED_EXIT",
+    "OTHER",
+  ];
+
+  it("(a) every DetectionEventType key returns an icon + non-empty Korean title", () => {
+    for (const eventType of allEventTypes) {
+      const presentation = detectionEventPresentationFor(eventType);
+      expect(presentation.icon).toBeTruthy();
+      expect(presentation.title).toMatch(/[가-힣]/);
+      expect(presentation.phrase).toBeTruthy();
+    }
+  });
+
+  it("(b) FALL_RISK and BED_EXIT severity === high", () => {
+    expect(detectionEventPresentationFor("FALL_RISK").severity).toBe("high");
+    expect(detectionEventPresentationFor("BED_EXIT").severity).toBe("high");
+  });
+
+  it("(c) OTHER with backendType 'bed-exit' resolves title '침대 이탈'", () => {
+    const presentation = detectionEventPresentationFor("OTHER", { backendType: "bed-exit" });
+    expect(presentation.title).toBe("침대 이탈");
+  });
+
+  it("(d) OTHER with unregistered backendType never returns the raw string in the title", () => {
+    const presentation = detectionEventPresentationFor("OTHER", { backendType: "weird-thing" });
+    expect(presentation.title).not.toBe("weird-thing");
+    expect(presentation.title).toMatch(/[가-힣]/);
+  });
+
+  it("OTHER with empty-string backendType returns safe fallback without crash", () => {
+    expect(() => detectionEventPresentationFor("OTHER", { backendType: "" })).not.toThrow();
+    const presentation = detectionEventPresentationFor("OTHER", { backendType: "" });
+    expect(presentation.title).not.toBe("");
+  });
+
+  it("OTHER without backendType returns safe fallback without crash", () => {
+    expect(() => detectionEventPresentationFor("OTHER")).not.toThrow();
+    const presentation = detectionEventPresentationFor("OTHER");
+    expect(presentation.title).toBeTruthy();
+  });
+});
+
 describe("eventPresentationFor", () => {
   const knownWireTypes = [
     "fall",
@@ -79,13 +129,6 @@ describe("eventPresentationFor", () => {
     for (const type of knownWireTypes) {
       expect(eventPresentationFor(type).title).not.toBe(type);
     }
-  });
-
-  it("presents SYSTEM_TEST as the shipped sentinel without emergency severity", () => {
-    const presentation = eventPresentationFor("SYSTEM_TEST");
-
-    expect(presentation.title).toBe("SYSTEM TEST");
-    expect(presentation.severity).toBe("medium");
   });
 
   it('falls back to "새 안전 알림" for an unregistered event type, never the raw string', () => {

@@ -36,32 +36,8 @@ function incident(id: string, eventType: "FALL_RISK" | "BED_EXIT"): DetectionEve
     aiSummary: "",
     detectedAt: "2026-08-12T00:00:00.000Z",
     alertStatus: "PENDING",
-    actions: [],
     emergency: eventType === "FALL_RISK",
   };
-}
-
-function systemTest(): DetectionEvent {
-  return {
-    id: "alert-system-tts-build",
-    backendEventId: "event-system-tts-build",
-    alertSeq: "3",
-    facilityId,
-    spaceId: null,
-    residentId: null,
-    cameraId: null,
-    eventType: "SYSTEM_TEST",
-    riskLevel: "LOW",
-    message: "SYSTEM TEST - NOT A RESIDENT ALERT",
-    aiSummary: "SYSTEM TEST - NOT A RESIDENT ALERT",
-    detectedAt: "2026-08-12T00:00:00.000Z",
-    alertStatus: "PENDING",
-    actions: [],
-    emergency: false,
-    testMode: "SYSTEM_TEST",
-    label: "SYSTEM TEST - NOT A RESIDENT ALERT",
-    ttsText: "System test emergency notification",
-  } as DetectionEvent;
 }
 
 describe("buildTTSAlerts", () => {
@@ -75,16 +51,5 @@ describe("buildTTSAlerts", () => {
     expect(result.map((alert) => alert.level)).toEqual(["DANGER", "EMERGENCY"]);
   });
 
-  it("builds a room-free SYSTEM_TEST TTS input", () => {
-    const [result] = buildTTSAlerts([space], { [space.id]: dangerStatus }, [floor], [systemTest()]);
 
-    expect(result).toMatchObject({
-      identity: "event-system-tts-build",
-      kind: "SYSTEM_TEST",
-      spaceId: null,
-      testMode: "SYSTEM_TEST",
-      ttsText: "System test emergency notification",
-    });
-    expect(result.name).toBeNull();
-  });
 });

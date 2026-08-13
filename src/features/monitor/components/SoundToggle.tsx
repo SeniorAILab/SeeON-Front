@@ -1,23 +1,19 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Volume2, VolumeX } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   clearTTSFailure,
   getTTSFailureReason,
+  retryPendingTTSFromTrustedInteraction,
   subscribeTTSFailure,
 } from "@/features/monitor/services/tts/ttsManager";
 import type { TTSFailureReason } from "@/features/monitor/services/tts/ttsProvider";
 
 /**
- * 실패 사유별 안내 문구.
- *
- * TV를 켜두기만 하고 아무도 클릭하지 않으면 브라우저 autoplay 정책이 첫
- * 발화를 막는다. 예전에는 그 실패를 조용히 삼켜서 "음성 안내 켜짐"인데
- * 낙상이 나도 소리가 안 나는 상태가 됐다. 요양보호사가 바로 행동할 수
- * 있는 문구로 표면화한다.
+ * autoplay 차단은 다음 실제 사용자 상호작용에서 즉시 재시도한다.
+ * 지원 불가와 엔진 오류만 화면에 남긴다.
  */
-const FAILURE_MESSAGE: Record<TTSFailureReason, string> = {
-  blocked: "소리를 켜려면 화면을 한 번 눌러 주세요.",
+const FAILURE_MESSAGE: Record<Exclude<TTSFailureReason, "blocked">, string> = {
   unsupported: "이 브라우저는 음성 안내를 지원하지 않습니다.",
   engine: "음성 안내를 재생하지 못했습니다. 소리를 다시 켜 주세요.",
 };
@@ -33,11 +29,32 @@ export function SoundToggle({
   const [failure, setFailure] = useState<TTSFailureReason | null>(() =>
     getTTSFailureReason()
   );
+  const toggleRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => subscribeTTSFailure(setFailure), []);
 
+  useEffect(() => {
+    if (!enabled || failure !== "blocked") return;
+
+    let removed = false;
+    const removeListeners = () => {
+      if (removed) return;
+      removed = true;
+      document.removeEventListener("pointerdown", onInteraction, true);
+      document.removeEventListener("keydown", onInteraction, true);
+    };
+    const onInteraction = (event: Event) => {
+      if (event.target instanceof Node && toggleRef.current?.contains(event.target)) return;
+      if (retryPendingTTSFromTrustedInteraction(event)) removeListeners();
+    };
+
+    document.addEventListener("pointerdown", onInteraction, true);
+    document.addEventListener("keydown", onInteraction, true);
+    return removeListeners;
+  }, [enabled, failure]);
+
   function handleToggle() {
-    // 사용자의 클릭은 autoplay 정책상 유효한 제스처다. 재시도 기회를 준다.
+    // 명시적 음성 설정은 자동 재시도와 별개로 기존 동작을 유지한다.
     clearTTSFailure();
     onToggle();
   }
@@ -45,6 +62,7 @@ export function SoundToggle({
   return (
     <div className="inline-flex flex-col items-start gap-1">
       <button
+        ref={toggleRef}
         onClick={handleToggle}
         className={cn(
           "inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-base font-semibold transition-colors",
@@ -57,7 +75,7 @@ export function SoundToggle({
         {enabled ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}
         음성 안내 {enabled ? "켜짐" : "꺼짐"}
       </button>
-      {enabled && failure && (
+      {enabled && failure !== null && failure !== "blocked" && (
         <p role="alert" className="text-sm font-medium text-status-danger">
           {FAILURE_MESSAGE[failure]}
         </p>

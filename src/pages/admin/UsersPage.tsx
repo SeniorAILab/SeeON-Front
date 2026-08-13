@@ -64,7 +64,7 @@ export function UsersPage() {
   }
 
   return (
-    <div className="max-w-4xl space-y-5">
+    <div className="mx-auto max-w-4xl space-y-5">
       <PageHeader title="사용자" description="시설 사용자를 조회하고 계정을 생성하거나 권한을 변경합니다." />
       {error && <p className="rounded-lg bg-status-dangerBg px-3 py-2 text-sm text-status-danger">{error}</p>}
       {createdPassword && (

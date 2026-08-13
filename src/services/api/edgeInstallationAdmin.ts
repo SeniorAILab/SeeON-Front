@@ -1,14 +1,8 @@
 import { requestJson } from "@/services/apiClient";
 import { parseReplaceEdgeInstallation } from "./edgeEnrollmentCredentialParsers";
-import {
-  parseEdgeOwnershipTransfer,
-  parseEdgeValidationEvents,
-  parseEdgeValidationRun,
-} from "./edgeInstallationAdminParsers";
+import { parseEdgeOwnershipTransfer } from "./edgeInstallationAdminParsers";
 import type {
   EdgeOwnershipTransfer,
-  EdgeValidationEventSummary,
-  EdgeValidationRun,
   OwnershipTransferManifestItem,
   ReplacedEdgeInstallation,
 } from "./edgeInstallationAdminTypes";
@@ -22,17 +16,6 @@ type InstallationMutationRequest = {
 export type ReplaceEdgeInstallationRequest = InstallationMutationRequest & {
   readonly expectedEnrollmentGeneration: number;
   readonly newClientInstallationRef: string;
-};
-
-export type CreateEdgeValidationRunRequest = InstallationMutationRequest & {
-  readonly expectedEnrollmentGeneration: number;
-  readonly durationSeconds: number;
-};
-
-export type ListEdgeValidationEventsRequest = {
-  readonly edgeInstallationId: string;
-  readonly validationRunId: string;
-  readonly signal?: AbortSignal;
 };
 
 export type TransferEdgeOwnershipRequest = InstallationMutationRequest & {
@@ -53,34 +36,6 @@ export async function replaceEdgeInstallation(
         expectedEnrollmentGeneration: request.expectedEnrollmentGeneration,
         newClientInstallationRef: request.newClientInstallationRef,
       }),
-    ),
-  );
-}
-
-export async function createEdgeValidationRun(
-  request: CreateEdgeValidationRunRequest,
-): Promise<EdgeValidationRun> {
-  return parseEdgeValidationRun(
-    await requestJson(
-      `/admin/edge-installations/${encodeURIComponent(request.edgeInstallationId)}/validation-runs`,
-      mutationOptions(request, {
-        schemaVersion: 1,
-        expectedEnrollmentGeneration: request.expectedEnrollmentGeneration,
-        durationSeconds: request.durationSeconds,
-      }),
-    ),
-  );
-}
-
-export async function listEdgeValidationEvents(
-  request: ListEdgeValidationEventsRequest,
-): Promise<readonly EdgeValidationEventSummary[]> {
-  const options: RequestInit = { method: "GET" };
-  if (request.signal !== undefined) options.signal = request.signal;
-  return parseEdgeValidationEvents(
-    await requestJson(
-      `/admin/edge-installations/${encodeURIComponent(request.edgeInstallationId)}/validation-runs/${encodeURIComponent(request.validationRunId)}/events`,
-      options,
     ),
   );
 }

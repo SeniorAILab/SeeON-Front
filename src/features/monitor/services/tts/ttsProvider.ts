@@ -11,11 +11,11 @@ export interface SpeakOptions {
   volume?: number;
 }
 
-/** 발화 실패 사유. UI가 사용자에게 무엇을 하라고 안내할지 결정한다. */
+/** 발화 실패 사유. autoplay 차단은 다음 실제 사용자 상호작용에서 즉시 재시도한다. */
 export type TTSFailureReason =
   /** 브라우저가 음성합성을 지원하지 않음 */
   | "unsupported"
-  /** autoplay 정책 차단 — 사용자가 화면을 한 번 눌러야 함 */
+  /** autoplay 정책 차단 */
   | "blocked"
   /** 음성 엔진 오류 */
   | "engine";
@@ -67,9 +67,8 @@ export class BrowserTTSProvider implements TTSProvider {
       u.pitch = opts.pitch ?? 1.0;
       u.volume = opts.volume ?? 1.0;
       u.onend = () => resolve({ ok: true });
-      // 실패를 성공처럼 삼키면 안 된다. TV를 켜두기만 하고 아무도 클릭하지
-      // 않으면 브라우저 autoplay 정책이 첫 발화를 막는데, 예전에는 그걸
-      // resolve()로 조용히 넘겨서 "소리 켜짐"인데 영영 안 울렸다.
+      // autoplay 차단은 실패로 보고한다. 상위 UI는 다음 실제 사용자
+      // 상호작용의 call stack에서 이 실제 발화를 즉시 재시도한다.
       u.onerror = (event) =>
         resolve({
           ok: false,

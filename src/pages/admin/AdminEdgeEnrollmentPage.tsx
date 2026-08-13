@@ -161,7 +161,7 @@ export function AdminEdgeEnrollmentPage() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl space-y-5">
+    <div className="space-y-5">
       <PageHeader
         title="엣지 등록 관리"
         description="시설 전용 엣지 자격을 발급하고 설치 세대와 검증 수명주기를 관리합니다."

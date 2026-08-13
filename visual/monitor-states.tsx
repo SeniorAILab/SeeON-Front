@@ -12,13 +12,12 @@ import { createRoot } from "react-dom/client";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { StaffLayout } from "@/components/layout/StaffLayout";
 import { RoomStatusBoard } from "@/components/status/RoomStatusBoard";
-import { SystemTestAlertBanner } from "@/components/status/SystemTestAlertBanner";
 import { MonitorHeader } from "@/features/monitor/components/MonitorHeader";
 import { FloorMonitorPage } from "@/features/monitor/pages/FloorMonitorPage";
 import { useAuthStore } from "@/stores/authStore";
 import { useFacilityStore } from "@/stores/facilityStore";
 import { useMonitorSettingsStore } from "@/features/monitor/stores/monitorSettingsStore";
-import { SYSTEM_TEST_LABEL, SYSTEM_TEST_TTS_TEXT, type DetectionEvent, type Floor, type Space, type SpaceStatus } from "@/types";
+import { type DetectionEvent, type Floor, type Space, type SpaceStatus } from "@/types";
 import "@/index.css";
 
 const MODE = new URLSearchParams(location.search).get("mode") ?? "mixed";
@@ -61,17 +60,6 @@ window.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
         headers: { "Content-Type": "application/json" },
       }),
     );
-  }
-  if (url.endsWith("/dashboard/receipts/presentation") && init?.method === "POST") {
-    const body = JSON.parse(String(init.body)) as { backendEventId: string; alertId: string; alertSeq: string; surface: string };
-    return Promise.resolve(new Response(JSON.stringify({
-      presentationId: "presentation-system-test-demo",
-      ...body,
-      kind: "presentation",
-      observedAt: "2026-08-12T00:00:00.000Z",
-      recordedAt: "2026-08-12T00:00:00.000Z",
-      duplicate: false,
-    }), { status: 201, headers: { "Content-Type": "application/json" } }));
   }
   return realFetch(input as RequestInfo, init);
 }) as typeof window.fetch;
@@ -157,26 +145,7 @@ const overviewFlowStatuses: Record<string, SpaceStatus> = Object.fromEntries(
   overviewFlowSpaces.map((sp) => [sp.id, status(sp.id, "STABLE", "LIVE")]),
 );
 
-const systemTestAlerts: DetectionEvent[] = [{
-  id: "alert-system-test-demo",
-  backendEventId: "event-system-test-demo",
-  alertSeq: "9001",
-  facilityId: FACILITY,
-  spaceId: null,
-  residentId: null,
-  cameraId: null,
-  eventType: "SYSTEM_TEST",
-  testMode: "SYSTEM_TEST",
-  label: SYSTEM_TEST_LABEL,
-  ttsText: SYSTEM_TEST_TTS_TEXT,
-  riskLevel: "LOW",
-  message: SYSTEM_TEST_LABEL,
-  aiSummary: SYSTEM_TEST_LABEL,
-  detectedAt: "2026-08-12T00:00:00.000Z",
-  alertStatus: "PENDING",
-  actions: [],
-  emergency: false,
-}];
+
 
 if (MODE === "route-grid") {
   useAuthStore.setState({
@@ -348,12 +317,6 @@ function Harness() {
       />
       {/* FloorMonitorPage와 같은 컨테이너다 — 보드가 남은 높이를 채운다. */}
       <div className="mt-4 flex min-h-0 flex-1 flex-col gap-3">
-      {MODE === "system-test" && (
-        <SystemTestAlertBanner
-          alerts={systemTestAlerts}
-          surface="monitor-system-test-banner:focus"
-        />
-      )}
       <div className="flex min-h-0 flex-1">
       <RoomStatusBoard
         // panel 모드: 요양보호사가 위험한 방을 눌렀을 때 뜨는 조작면.

@@ -26,15 +26,16 @@ vi.mock("@/features/monitor/hooks/useTTSAlerts", () => ({
   buildTTSAlerts: vi.fn(() => []),
   useTTSAlerts: (...args: unknown[]) => useTTSAlertsMock(...args),
 }));
+const useRealtimeSpaceStatusMock = vi.fn((_facilityId: string, _spaces: unknown[]) => ({
+  statuses: {},
+  sortedSpaces: [],
+  summary: { totalSpaces: 0, stable: 0, caution: 0, danger: 0, checkNeeded: 0, unacknowledged: 0 },
+  totalPeople: 0,
+  connection: "CONNECTED" as const,
+  lastUpdateAt: null,
+}));
 vi.mock("@/features/monitor/hooks/useRealtimeSpaceStatus", () => ({
-  useRealtimeSpaceStatus: () => ({
-    statuses: {},
-    sortedSpaces: [],
-    summary: { totalSpaces: 0, stable: 0, caution: 0, danger: 0, checkNeeded: 0, unacknowledged: 0 },
-    totalPeople: 0,
-    connection: "CONNECTED",
-    lastUpdateAt: null,
-  }),
+  useRealtimeSpaceStatus: (facilityId: string, spaces: unknown[]) => useRealtimeSpaceStatusMock(facilityId, spaces),
 }));
 vi.mock("@/features/monitor/components/MonitorHeader", () => ({
   MonitorHeader: (props: unknown) => monitorHeaderMock(props),
@@ -47,6 +48,14 @@ vi.mock("@/services/dashboardService", () => ({ dashboardService: { getDashboard
 describe("FloorMonitorPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    useRealtimeSpaceStatusMock.mockReturnValue({
+      statuses: {},
+      sortedSpaces: [],
+      summary: { totalSpaces: 0, stable: 0, caution: 0, danger: 0, checkNeeded: 0, unacknowledged: 0 },
+      totalPeople: 0,
+      connection: "CONNECTED",
+      lastUpdateAt: null,
+    });
     useMonitorStore.setState({ dashboard: null, statuses: {}, loading: false });
     useAuthStore.setState({
       user: { id: "staff-1", name: "Care Staff", email: "staff@example.test", role: "STAFF", facilityId },
@@ -85,45 +94,6 @@ describe("FloorMonitorPage", () => {
 
     await waitFor(() => expect(useTTSAlertsMock).toHaveBeenLastCalledWith([], true));
   });
-  it("wires facility-level SYSTEM_TEST alerts to the banner and identity TTS builder", async () => {
-    const systemAlert = {
-      id: "alert-system-monitor",
-      backendEventId: "event-system-monitor",
-      alertSeq: "30",
-      facilityId,
-      spaceId: null,
-      residentId: null,
-      cameraId: null,
-      eventType: "SYSTEM_TEST" as const,
-      testMode: "SYSTEM_TEST" as const,
-      label: "SYSTEM TEST - NOT A RESIDENT ALERT" as const,
-      ttsText: "System test emergency notification" as const,
-      riskLevel: "LOW" as const,
-      message: "SYSTEM TEST - NOT A RESIDENT ALERT",
-      aiSummary: "SYSTEM TEST - NOT A RESIDENT ALERT",
-      detectedAt: "2026-08-12T00:00:00.000Z",
-      alertStatus: "PENDING" as const,
-      actions: [],
-      emergency: false,
-    };
-    useMonitorStore.setState({
-      dashboard: {
-        facility: { id: facilityId, name: "테스트 시설", address: "", phone: "" },
-        floors: [],
-        spaces: [],
-        statuses: {},
-        summary: { totalSpaces: 0, stable: 0, caution: 0, danger: 0, checkNeeded: 0, unacknowledged: 1 },
-        unacknowledgedEvents: [systemAlert],
-      },
-    });
-    const { buildTTSAlerts } = await import("@/features/monitor/hooks/useTTSAlerts");
-
-    render(<FloorMonitorPage />);
-
-    expect(await screen.findByText("SYSTEM TEST")).toBeTruthy();
-    await waitFor(() => expect(buildTTSAlerts).toHaveBeenCalledWith([], {}, expect.any(Array), [systemAlert]));
-  });
-
   it("redirects legacy all-view settings to a configured floor when all-view is disabled", async () => {
     useMonitorSettingsStore.setState({ allowAllView: false, defaultFloorId: "all" });
 
@@ -144,6 +114,29 @@ describe("FloorMonitorPage", () => {
       showAllView: false,
     });
   });
+
+  it("excludes spaces outside visibleSpaceIds from the spaces handed to the realtime hook (and the board)", async () => {
+    vi.mocked(dashboardService.getDashboard).mockResolvedValue({
+      facility: { id: facilityId, name: "행복요양원", address: "의정부시", phone: "031" },
+      floors: [{ id: "fl_2f", facilityId, name: "2F", orderIndex: 2, provisioningSource: "PRODUCT" }],
+      spaces: [
+        { id: "space-visible", facilityId, floorId: "fl_2f", name: "201호", type: "ROOM", capacity: 2, isActive: true, provisioningSource: "PRODUCT" },
+        { id: "space-hidden", facilityId, floorId: "fl_2f", name: "202호", type: "ROOM", capacity: 2, isActive: true, provisioningSource: "PRODUCT" },
+      ],
+      statuses: {},
+      summary: { totalSpaces: 0, stable: 0, caution: 0, danger: 0, checkNeeded: 0, unacknowledged: 0 },
+      unacknowledgedEvents: [],
+    });
+    useMonitorSettingsStore.setState({ visibleSpaceIds: ["space-visible"] });
+
+    render(<FloorMonitorPage />);
+
+    await waitFor(() => expect(useRealtimeSpaceStatusMock).toHaveBeenCalled());
+    const shownSpaces = useRealtimeSpaceStatusMock.mock.calls.at(-1)?.[1] ?? [];
+    expect(shownSpaces.map((s) => (s as { id: string }).id)).toEqual(["space-visible"]);
+    expect(shownSpaces.map((s) => (s as { id: string }).id)).not.toContain("space-hidden");
+  });
+
 });
 
 describe("FloorMonitorPage — allView-keyed surface sizing", () => {

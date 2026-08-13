@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  listAlerts,
   listAlertsEndpoint,
   listAllAlerts,
   mapAlert,
@@ -8,7 +9,6 @@ import {
   resolveAlert,
   resolveAlertEndpoint,
   type AlertDto,
-  type BackendAlertDto,
 } from "./alertEndpoints";
 import { requestJson } from "@/services/apiClient";
 const SCOPED_FACILITY_ID = "fac_happy_nokyang";
@@ -19,6 +19,22 @@ vi.mock("@/services/apiClient", () => ({
 }));
 
 const requestJsonMock = vi.mocked(requestJson);
+
+const retiredOperationalDto = {
+  alertSeq: "retired-15",
+  id: "alert-retired-15",
+  backendEventId: "event-retired-15",
+  facilityId: SCOPED_FACILITY_ID,
+  residentId: null,
+  cameraId: "cam_sp_201",
+  spaceId: "sp_201",
+  room: "201호",
+  type: "SYSTEM_TEST",
+  probability: 0.95,
+  snapshotKey: null,
+  detectedAt: "2026-08-13T00:00:00.000Z",
+  status: "NEW",
+} as const;
 
 describe("alertEndpoints", () => {
   it("maps backend bed-exit alerts to frontend domain alerts", () => {
@@ -116,60 +132,8 @@ describe("alertEndpoints", () => {
     expect(mapped.alertStatus).toBe("ACKNOWLEDGED");
   });
 
-  it("maps a facility-level SYSTEM_TEST without room, resident, camera, media, or probability assumptions", () => {
-    const dto = {
-      alertSeq: "15",
-      id: "alert-system-test-1",
-      backendEventId: "event-system-test-1",
-      facilityId: SCOPED_FACILITY_ID,
-      residentId: null,
-      cameraId: null,
-      spaceId: null,
-      room: null,
-      space: null,
-      type: "SYSTEM_TEST",
-      detectedAt: "2026-08-12T00:00:00.000Z",
-      status: "NEW",
-      testMode: "SYSTEM_TEST",
-      label: "SYSTEM TEST - NOT A RESIDENT ALERT",
-      ttsText: "System test emergency notification",
-    } as BackendAlertDto;
-
-    const mapped = mapAlertDto(dto);
-
-    expect(mapped).toMatchObject({
-      id: "alert-system-test-1",
-      backendEventId: "event-system-test-1",
-      spaceId: null,
-      residentId: null,
-      cameraId: null,
-      eventType: "SYSTEM_TEST",
-      backendType: "SYSTEM_TEST",
-      testMode: "SYSTEM_TEST",
-      label: "SYSTEM TEST - NOT A RESIDENT ALERT",
-      emergency: false,
-    });
-    expect(mapped.room).toBeUndefined();
-    expect(mapped.confidence).toBeUndefined();
-  });
-
-  it("rejects a SYSTEM_TEST payload that carries room or camera assumptions", () => {
-    expect(() => mapAlertDto({
-      alertSeq: "16",
-      id: "alert-system-test-invalid",
-      backendEventId: "event-system-test-invalid",
-      facilityId: SCOPED_FACILITY_ID,
-      residentId: null,
-      cameraId: "camera-not-allowed",
-      spaceId: null,
-      room: "room-not-allowed",
-      type: "SYSTEM_TEST",
-      detectedAt: "2026-08-12T00:00:00.000Z",
-      status: "NEW",
-      testMode: "SYSTEM_TEST",
-      label: "SYSTEM TEST - NOT A RESIDENT ALERT",
-      ttsText: "System test emergency notification",
-    } as unknown as BackendAlertDto)).toThrow("Invalid SYSTEM_TEST alert contract");
+  it("rejects the retired discriminator before the unknown operational fallback", () => {
+    expect(() => mapAlertDto(retiredOperationalDto)).toThrow();
   });
 
   it("keeps the backend event type string when the frontend domain maps it to OTHER", () => {
@@ -226,33 +190,6 @@ describe("alerts API seam", () => {
 
     expect(alert.status).toBe("NEW");
     expect(alert.alertStatus).toBe("PENDING");
-  });
-
-  it("maps a SYSTEM_TEST list item without inventing room or resident data", () => {
-    const alert = mapAlert({
-      alertSeq: "system-seq-1",
-      id: "alert-system-list-1",
-      backendEventId: "event-system-list-1",
-      facilityId: "f1",
-      residentId: null,
-      cameraId: null,
-      spaceId: null,
-      type: "SYSTEM_TEST",
-      detectedAt: "2026-08-12T00:00:00.000Z",
-      status: "NEW",
-      testMode: "SYSTEM_TEST",
-      label: "SYSTEM TEST - NOT A RESIDENT ALERT",
-      ttsText: "System test emergency notification",
-    } as unknown as AlertDto);
-
-    expect(alert).toMatchObject({
-      spaceId: null,
-      room: null,
-      residentName: null,
-      type: "SYSTEM_TEST",
-      testMode: "SYSTEM_TEST",
-      label: "SYSTEM TEST - NOT A RESIDENT ALERT",
-    });
   });
 
   it("maps an ACKED alert with legacy acknowledged badge and actor name", () => {
@@ -322,6 +259,12 @@ describe("alerts API seam", () => {
     requestJsonMock.mockResolvedValue([{ ...baseDto, id: 123 }]);
 
     await expect(listAlertsEndpoint()).rejects.toThrow("Malformed alert response");
+  });
+
+  it("rejects the retired discriminator from the alert-view REST array", async () => {
+    requestJsonMock.mockResolvedValue([retiredOperationalDto]);
+
+    await expect(listAlertsEndpoint()).rejects.toThrow();
   });
 });
 
@@ -447,6 +390,15 @@ describe("listAllAlerts — 목록이 서버 기본값에서 잘리지 않는다
     const secondUrl = requestJsonMock.mock.calls[1]?.[0] as string;
     expect(secondUrl).toContain("beforeSeq=171");
     expect(secondUrl).toContain("limit=200");
+  });
+
+  it("rejects the retired discriminator from REST arrays and paged history", async () => {
+    requestJsonMock.mockResolvedValue([retiredOperationalDto]);
+    await expect(listAlerts()).rejects.toThrow();
+
+    requestJsonMock.mockReset();
+    requestJsonMock.mockResolvedValue([retiredOperationalDto]);
+    await expect(listAllAlerts()).rejects.toThrow();
   });
 
   it("첫 장이 덜 찼으면 한 번만 부른다", async () => {

@@ -54,7 +54,7 @@ export function AdminAlertSettingsPage() {
   if (!settings) return <p className="text-sm text-gray-400">불러오는 중...</p>;
 
   return (
-    <div className="max-w-2xl space-y-5">
+    <div className="mx-auto max-w-2xl space-y-5">
       <PageHeader
         title="이메일 알림 설정"
         description="위험 이벤트 발생 시 이메일로 알림을 받을 주소와 수신 여부를 설정합니다."

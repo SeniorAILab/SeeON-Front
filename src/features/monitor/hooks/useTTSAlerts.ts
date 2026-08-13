@@ -20,22 +20,6 @@ export function buildTTSAlerts(
     if (!identity || seenIdentities.has(identity)) continue;
     seenIdentities.add(identity);
 
-    if (alert.testMode === "SYSTEM_TEST" && alert.eventType === "SYSTEM_TEST" && alert.ttsText) {
-      out.push({
-        identity,
-        kind: "SYSTEM_TEST",
-        spaceId: null,
-        name: null,
-        level: "CAUTION",
-        reason: alert.label ?? "",
-        floorName: null,
-        testMode: "SYSTEM_TEST",
-        ttsText: alert.ttsText,
-      });
-      continue;
-    }
-
-    if (!alert.spaceId) continue;
     const space = spaceById.get(alert.spaceId);
     if (!space) continue;
     representedSpaces.add(space.id);
@@ -74,7 +58,7 @@ export function buildTTSAlerts(
 export function useTTSAlerts(alerts: TTSAlertInput[], enabled: boolean) {
   const signature = useMemo(
     () => alerts
-      .map((alert) => `${alert.identity}:${alert.kind}:${alert.level}:${alert.kind === "SYSTEM_TEST" ? alert.ttsText : ""}`)
+      .map((alert) => `${alert.identity}:${alert.level}`)
       .sort()
       .join("|"),
     [alerts],

@@ -11,7 +11,6 @@ import {
   VideoOff,
 } from "lucide-react";
 import type {
-  ActionType,
   AlertLifecycleStatus,
   DetectionEventType,
   Level,
@@ -117,6 +116,113 @@ const UNKNOWN_EVENT_PRESENTATION: EventPresentation = {
 };
 
 /**
+ * DetectionEventType(SCREAMING_SNAKE_CASE, 실시간 공간 상태 그룹핑용)의
+ * 알림 카드 표시 정보. 위 eventPresentationRegistry(kebab-case wire 계약)와는
+ * 별개 시스템이다 — 두 레지스트리를 섞으면 안 된다.
+ */
+const detectionEventPresentationRegistry: Record<DetectionEventType, EventPresentation> = {
+  FALL_RISK: {
+    icon: AlertTriangle,
+    title: "낙상 위험",
+    severity: "high",
+    phrase: "바닥에 쓰러진 것으로 보입니다",
+  },
+  BED_EXIT: {
+    icon: Bed,
+    title: "침대 이탈",
+    severity: "high",
+    phrase: "침대에서 혼자 벗어났습니다",
+  },
+  PROLONGED_INACTIVITY: {
+    icon: Clock,
+    title: "장시간 미움직임",
+    severity: "medium",
+    phrase: "오랫동안 움직임이 없습니다",
+  },
+  WANDERING: {
+    icon: Footprints,
+    title: "배회 감지",
+    severity: "medium",
+    phrase: "계속 돌아다니고 있습니다",
+  },
+  REPEATED_STANDING_ATTEMPT: {
+    icon: PersonStanding,
+    title: "반복 기립 시도",
+    severity: "medium",
+    phrase: "혼자 일어나려는 시도가 반복됩니다",
+  },
+  SOLO_MOVEMENT: {
+    icon: UserRound,
+    title: "혼자 이동 시도",
+    severity: "medium",
+    phrase: "혼자 이동하려 하고 있습니다",
+  },
+  MOVEMENT_INCREASE: {
+    icon: PersonStanding,
+    title: "움직임 증가",
+    severity: "medium",
+    phrase: "비정상적으로 움직임이 증가했습니다",
+  },
+  STABLE: {
+    icon: UserRound,
+    title: "안정 상태",
+    severity: "medium",
+    phrase: "모든 것이 정상입니다",
+  },
+  SYSTEM_TEST: {
+    icon: FlaskConical,
+    title: "SYSTEM TEST",
+    severity: "medium",
+    phrase: "시스템 기능 점검 알림입니다",
+  },
+  OTHER: {
+    icon: HelpCircle,
+    title: "기타 감지",
+    severity: "medium",
+    phrase: "확인이 필요한 새로운 알림입니다",
+  },
+};
+
+/**
+ * DetectionEventType를 표시 정보로 변환한다. OTHER 유형에 대해 선택적으로
+ * backendType을 받아서 kebab-case 레지스트리에서 한글 제목을 해석한다.
+ * 미등록 backendType은 절대 원문 그대로 화면에 내보내지 않는다.
+ */
+export function detectionEventPresentationFor(
+  eventType: DetectionEventType,
+  event?: { backendType?: string | null }
+): EventPresentation {
+  // OTHER가 아니면 바로 반환
+  if (eventType !== "OTHER") {
+    return detectionEventPresentationRegistry[eventType];
+  }
+
+  // OTHER + backendType이 있으면 kebab-case 레지스트리에서 제목을 찾기
+  const backendType = event?.backendType;
+  if (backendType) {
+    const presentation = eventPresentationRegistry[backendType];
+    if (presentation) {
+      return presentation;
+    }
+    // kebab-case 레지스트리에 없으면 eventTypeLabel Proxy로 시도
+    // (그래도 원문이 나오면 UNKNOWN_EVENT_PRESENTATION으로 대체)
+    const label = eventTypeLabel[backendType];
+    if (label && !label.includes(backendType)) {
+      // 실제 한글 제목이 나온 경우
+      return {
+        icon: UNKNOWN_EVENT_PRESENTATION.icon,
+        title: label,
+        severity: UNKNOWN_EVENT_PRESENTATION.severity,
+        phrase: UNKNOWN_EVENT_PRESENTATION.phrase,
+      };
+    }
+  }
+
+  // OTHER이지만 backendType이 없거나 미등록이면 안전한 폴백
+  return detectionEventPresentationRegistry["OTHER"];
+}
+
+/**
  * 알림 API의 kebab-case wire 계약(`AlertView.type`, `AlertEventTypes` 등)에
  * 대응하는 표시 정보.
  *
@@ -187,12 +293,4 @@ export function eventPresentationFor(type: string): EventPresentation {
   return eventPresentationRegistry[type] ?? UNKNOWN_EVENT_PRESENTATION;
 }
 
-export const actionTypeLabel: Record<ActionType, string> = {
-  ACKNOWLEDGED: "확인 완료",
-  STAFF_VISIT: "직원 방문 중",
-  HELP_REQUEST: "도움 요청",
-  NO_ISSUE: "이상 없음",
-  GUARDIAN_CONTACT: "보호자 연락",
-  HOSPITAL_TRANSFER: "병원 이송",
-  MEMO: "기타 메모",
-};
+

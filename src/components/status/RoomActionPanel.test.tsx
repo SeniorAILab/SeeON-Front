@@ -1,16 +1,14 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { StrictMode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { RoomActionPanel, eventGroupsFor } from "./RoomActionPanel";
+import { RoomActionPanel } from "./RoomActionPanel";
 import type { DetectionEvent, Space, SpaceStatus } from "@/types";
 import { formatDateTime } from "@/lib/format";
-import type { AlertNote } from "@/services/alertService";
 
 vi.mock("@/services/alertService", () => ({
   alertService: {
     resolve: vi.fn(async () => ({})),
     acknowledge: vi.fn(async () => ({})),
-    listNotes: vi.fn(async () => []),
   },
 }));
 
@@ -47,7 +45,6 @@ function alert(overrides: Partial<DetectionEvent> = {}): DetectionEvent {
     aiSummary: "낙상 위험이 감지되었습니다.",
     detectedAt: "2026-07-03T00:00:00.000Z",
     alertStatus: "PENDING",
-    actions: [],
     ...overrides,
   };
 }
@@ -55,58 +52,9 @@ function alert(overrides: Partial<DetectionEvent> = {}): DetectionEvent {
 beforeEach(async () => {
   const { alertService } = await import("@/services/alertService");
   vi.mocked(alertService.acknowledge).mockClear();
-  vi.mocked(alertService.listNotes).mockReset();
-  vi.mocked(alertService.listNotes).mockResolvedValue([]);
 });
 
-function note(overrides: Partial<AlertNote> = {}): AlertNote {
-  return {
-    id: "note-1",
-    type: "MEMO",
-    note: "기존 메모",
-    createdBy: "staff-1",
-    authorRole: "STAFF",
-    createdAt: "2026-07-03T00:00:30.000Z",
-    ...overrides,
-  };
-}
-
 describe("RoomActionPanel", () => {
-  it("groups real room alerts by event type and resolves individual alerts", async () => {
-    const alerts = [
-      alert({ id: "fall-1", eventType: "FALL_RISK", aiSummary: "낙상 1" }),
-      alert({ id: "fall-2", eventType: "FALL_RISK", aiSummary: "낙상 2" }),
-      alert({ id: "bed-1", eventType: "BED_EXIT", aiSummary: "침대 이탈" }),
-    ];
-    expect(eventGroupsFor(status("a", "DANGER"), alerts).map((group) => [group.label, group.count])).toEqual([
-      ["낙상 위험", 2],
-      ["침대 이탈", 1],
-    ]);
-    const { alertService } = await import("@/services/alertService");
-    const onResolved = vi.fn();
-    render(<RoomActionPanel space={spaces[1]} status={status("a", "DANGER")} alerts={alerts} onClose={vi.fn()} onResolved={onResolved} />);
-    fireEvent.click(screen.getAllByRole("button", { name: "개별 확인" })[1]);
-    await waitFor(() => expect(alertService.acknowledge).toHaveBeenCalledWith("fall-2"));
-    expect(alertService.acknowledge).not.toHaveBeenCalledWith("alert-a");
-    expect(onResolved).toHaveBeenCalled();
-  });
-
-  it("resolves only the alert ids in the clicked event group", async () => {
-    const alerts = [
-      alert({ id: "fall-1", eventType: "FALL_RISK", aiSummary: "낙상 1" }),
-      alert({ id: "fall-2", eventType: "FALL_RISK", aiSummary: "낙상 2" }),
-      alert({ id: "bed-1", eventType: "BED_EXIT", aiSummary: "침대 이탈" }),
-    ];
-    const { alertService } = await import("@/services/alertService");
-    render(<RoomActionPanel space={spaces[1]} status={status("a", "DANGER")} alerts={alerts} onClose={vi.fn()} />);
-
-    fireEvent.click(screen.getAllByRole("button", { name: "그룹 확인" })[0]);
-
-    await waitFor(() => expect(alertService.acknowledge).toHaveBeenCalledTimes(2));
-    expect(alertService.acknowledge).toHaveBeenCalledWith("fall-1");
-    expect(alertService.acknowledge).toHaveBeenCalledWith("fall-2");
-    expect(alertService.acknowledge).not.toHaveBeenCalledWith("bed-1");
-  });
   it("pages alert groups by 20 rows and collapses back to five rows", () => {
     const alerts = Array.from({ length: 30 }, (_, index) =>
       alert({
@@ -135,31 +83,6 @@ describe("RoomActionPanel", () => {
     expect(screen.getByRole("button", { name: "더 보기 (25)" })).toBeTruthy();
   });
 
-  it("resolves every alert in a group even when most rows are collapsed", async () => {
-    const alerts = Array.from({ length: 8 }, (_, index) =>
-      alert({ id: `fall-${index}`, aiSummary: `낙상 ${index}`, detectedAt: `2026-07-03T00:0${index}:00.000Z` }),
-    );
-    const { alertService } = await import("@/services/alertService");
-    render(<RoomActionPanel space={spaces[1]} status={status("a", "DANGER")} alerts={alerts} onClose={vi.fn()} />);
-
-    fireEvent.click(screen.getByRole("button", { name: "그룹 확인" }));
-
-    await waitFor(() => expect(alertService.acknowledge).toHaveBeenCalledTimes(8));
-    for (const item of alerts) expect(alertService.acknowledge).toHaveBeenCalledWith(item.id);
-  });
-
-  it("renders the newest event first within each group", () => {
-    const alerts = [
-      alert({ id: "old", aiSummary: "오래된 알림", detectedAt: "2026-07-03T00:01:00.000Z" }),
-      alert({ id: "new", aiSummary: "최신 알림", detectedAt: "2026-07-03T00:03:00.000Z" }),
-      alert({ id: "middle", aiSummary: "중간 알림", detectedAt: "2026-07-03T00:02:00.000Z" }),
-    ];
-
-    render(<RoomActionPanel space={spaces[1]} status={status("a", "DANGER")} alerts={alerts} onClose={vi.fn()} />);
-
-    expect(screen.getAllByRole("listitem")[0].textContent).toContain("최신 알림");
-  });
-
   it("renders each alert's formatted detected time", () => {
     const detectedAt = "2026-07-03T00:00:00.000Z";
     render(<RoomActionPanel space={spaces[1]} status={status("a", "DANGER")} alerts={[alert({ detectedAt })]} onClose={vi.fn()} />);
@@ -167,16 +90,11 @@ describe("RoomActionPanel", () => {
     expect(screen.getByText(formatDateTime(detectedAt))).toBeTruthy();
   });
 
-  it("does not fabricate actionable groups from stale status flags", () => {
-    const alertStatus = { ...status("a", "DANGER"), bedsideActivity: true, soloMovementAttempt: true };
-    expect(eventGroupsFor(alertStatus)).toEqual([]);
-  });
-
   it("explains the 확인 → 해결 완료 flow without any text input", () => {
     render(<RoomActionPanel space={spaces[1]} status={status("a", "DANGER")} alerts={[alert()]} onClose={vi.fn()} />);
 
     expect(screen.getByText(/알림을 받았다고 알리세요/)).toBeTruthy();
-    // 메모 히스토리(읽기 전용)는 남지만, 메모를 작성하는 입력창은 없다.
+    // 메모 입력창은 없다 - 확인/해결 완료는 텍스트 없이 동작한다.
     expect(screen.queryByRole("textbox")).toBeNull();
   });
 
@@ -257,24 +175,6 @@ describe("RoomActionPanel", () => {
     expect(classNames.some((className) => /gray-300/.test(className))).toBe(false);
   });
 
-  it("targets the real alert id (not the synthetic status id) for read-only note history", async () => {
-    const { alertService } = await import("@/services/alertService");
-    vi.mocked(alertService.listNotes).mockResolvedValueOnce([note({ note: "기존 메모" })]);
-
-    render(<RoomActionPanel space={spaces[1]} status={status("a", "DANGER")} alerts={[alert({ id: "event-1" })]} onClose={vi.fn()} />);
-
-    expect(await screen.findByText("기존 메모")).toBeTruthy();
-    expect(alertService.listNotes).toHaveBeenCalledWith("event-1");
-    expect(alertService.listNotes).not.toHaveBeenCalledWith("alert-a");
-  });
-
-  it("uses the first alert id for notes when status id is absent", async () => {
-    const { alertService } = await import("@/services/alertService");
-    render(<RoomActionPanel space={spaces[1]} alerts={[alert({ id: "event-1" })]} onClose={vi.fn()} />);
-
-    await waitFor(() => expect(alertService.listNotes).toHaveBeenCalledWith("event-1"));
-  });
-
   it("does not resolve a synthetic status id when no real alert exists", async () => {
     const { alertService } = await import("@/services/alertService");
     render(<RoomActionPanel space={spaces[1]} status={{ ...status("a", "DANGER"), id: "status-a" }} alerts={[]} onClose={vi.fn()} />);
@@ -284,53 +184,115 @@ describe("RoomActionPanel", () => {
     fireEvent.click(resolveButton);
     expect(alertService.acknowledge).not.toHaveBeenCalled();
   });
-  it("keeps loaded memo history after the active alert is resolved", async () => {
-    const { alertService } = await import("@/services/alertService");
-    vi.mocked(alertService.listNotes).mockResolvedValue([note({ note: "해결 전 메모" })]);
-    const { rerender } = render(
-      <RoomActionPanel space={spaces[1]} status={status("a", "DANGER")} alerts={[alert({ id: "event-1" })]} onClose={vi.fn()} />,
+
+  it("renders one chronological feed sorted newest-first across mixed event types", () => {
+    const alerts = [
+      alert({ id: "fall-old", eventType: "FALL_RISK", detectedAt: "2026-07-03T00:01:00.000Z" }),
+      alert({ id: "bed-1", eventType: "BED_EXIT", detectedAt: "2026-07-03T00:03:00.000Z" }),
+      alert({ id: "wander-1", eventType: "WANDERING", detectedAt: "2026-07-03T00:02:00.000Z" }),
+      alert({ id: "wander-new", eventType: "WANDERING", detectedAt: "2026-07-03T00:04:00.000Z" }),
+    ];
+
+    const { container } = render(
+      <RoomActionPanel space={spaces[1]} status={status("a", "DANGER")} alerts={alerts} onClose={vi.fn()} />,
     );
 
-    expect(await screen.findByText("해결 전 메모")).toBeTruthy();
-    rerender(<RoomActionPanel space={spaces[1]} status={status("a", "STABLE")} alerts={[]} onClose={vi.fn()} />);
-
-    expect(screen.getByText("해결 전 메모")).toBeTruthy();
-    expect(screen.queryByText("저장된 메모가 없습니다.")).toBeNull();
-    expect(alertService.listNotes).toHaveBeenCalledTimes(1);
+    const rows = [...container.querySelectorAll("[data-event-type]")];
+    expect(rows.map((row) => row.getAttribute("data-event-type"))).toEqual([
+      "WANDERING",
+      "BED_EXIT",
+      "WANDERING",
+      "FALL_RISK",
+    ]);
+    expect(rows.map((row) => row.closest("li")?.getAttribute("data-event-type") ?? row.getAttribute("data-event-type"))).toEqual([
+      "WANDERING",
+      "BED_EXIT",
+      "WANDERING",
+      "FALL_RISK",
+    ]);
+    // 실제 정렬 순서: fall-new(00:04) > bed-1(00:03) > wander-1(00:02) > fall-old(00:01)
+    const idsInOrder = rows.map((row) => row.closest("li")?.textContent ?? "");
+    expect(idsInOrder[0]).toContain(formatDateTime("2026-07-03T00:04:00.000Z"));
+    expect(idsInOrder[3]).toContain(formatDateTime("2026-07-03T00:01:00.000Z"));
   });
-  it("keeps the viewed alert memo history when a sibling alert remains active", async () => {
-    const { alertService } = await import("@/services/alertService");
-    vi.mocked(alertService.listNotes).mockImplementation(async (alertId) =>
-      alertId === "event-a" ? [note({ note: "A 메모" })] : [note({ note: "B 메모" })],
-    );
-    const { rerender } = render(
+
+  it("shows the Korean title for a FALL_RISK row", () => {
+    render(
       <RoomActionPanel
         space={spaces[1]}
         status={status("a", "DANGER")}
-        alerts={[alert({ id: "event-a" }), alert({ id: "event-b" })]}
+        alerts={[alert({ id: "fall-1", eventType: "FALL_RISK" })]}
         onClose={vi.fn()}
       />,
     );
 
-    expect(await screen.findByText("A 메모")).toBeTruthy();
-    rerender(<RoomActionPanel space={spaces[1]} status={status("a", "DANGER")} alerts={[alert({ id: "event-b" })]} onClose={vi.fn()} />);
-
-    expect(screen.getByText("A 메모")).toBeTruthy();
-    expect(screen.queryByText("B 메모")).toBeNull();
-    expect(alertService.listNotes).toHaveBeenCalledTimes(1);
+    expect(screen.getByText("낙상 위험")).toBeTruthy();
   });
-  it("does not retain space A notes when rerendered for space B without alerts", async () => {
+
+  it("acknowledges exactly the clicked row's alert id", async () => {
+    const alerts = [
+      alert({ id: "fall-1", eventType: "FALL_RISK", detectedAt: "2026-07-03T00:02:00.000Z" }),
+      alert({ id: "bed-1", eventType: "BED_EXIT", detectedAt: "2026-07-03T00:01:00.000Z" }),
+    ];
     const { alertService } = await import("@/services/alertService");
-    vi.mocked(alertService.listNotes).mockResolvedValue([note({ note: "201호 메모" })]);
-    const { rerender } = render(
-      <RoomActionPanel space={spaces[1]} status={status("a", "DANGER")} alerts={[alert({ id: "event-1" })]} onClose={vi.fn()} />,
+    render(<RoomActionPanel space={spaces[1]} status={status("a", "DANGER")} alerts={alerts} onClose={vi.fn()} />);
+
+    // 행 버튼은 피드 순서(최신순)로 나열되고, 푸터 확인 버튼이 마지막에 온다. fall-1이 더 최신이므로 첫 번째 행다.
+    fireEvent.click(screen.getAllByRole("button", { name: "확인" })[0]);
+
+    await waitFor(() => expect(alertService.acknowledge).toHaveBeenCalledWith("fall-1"));
+    expect(alertService.acknowledge).not.toHaveBeenCalledWith("bed-1");
+    expect(alertService.acknowledge).toHaveBeenCalledTimes(1);
+  });
+
+  it("disables the row 확인 button once that alert is ACKNOWLEDGED", () => {
+    render(
+      <RoomActionPanel
+        space={spaces[1]}
+        status={status("a", "DANGER")}
+        alerts={[alert({ id: "fall-1", eventType: "FALL_RISK", alertStatus: "ACKNOWLEDGED" })]}
+        onClose={vi.fn()}
+      />,
     );
 
-    expect(await screen.findByText("201호 메모")).toBeTruthy();
-    rerender(<RoomActionPanel space={spaces[0]} status={status("b", "STABLE")} alerts={[]} onClose={vi.fn()} />);
+    const rowAckButtons = screen.getAllByRole("button", { name: "확인" });
+    // row-level button is the last one after the header/footer 확인 button.
+    const rowAckButton = rowAckButtons[rowAckButtons.length - 1] as HTMLButtonElement;
+    expect(rowAckButton.disabled).toBe(true);
+  });
 
-    expect(screen.queryByText("201호 메모")).toBeNull();
-    expect(screen.getByText("저장된 메모가 없습니다.")).toBeTruthy();
+  it("shows the unacknowledged count in the header subtitle", () => {
+    const alerts = [
+      alert({ id: "fall-1", eventType: "FALL_RISK", alertStatus: "PENDING" }),
+      alert({ id: "bed-1", eventType: "BED_EXIT", alertStatus: "ACKNOWLEDGED" }),
+      alert({ id: "wander-1", eventType: "WANDERING", alertStatus: "SENT" }),
+    ];
+
+    render(<RoomActionPanel space={spaces[1]} status={status("a", "DANGER")} alerts={alerts} onClose={vi.fn()} />);
+
+    expect(screen.getByText("미확인 2건")).toBeTruthy();
+  });
+
+  it("never renders a memo history section", () => {
+    render(<RoomActionPanel space={spaces[1]} status={status("a", "DANGER")} alerts={[alert()]} onClose={vi.fn()} />);
+
+    expect(screen.queryByText("메모 히스토리")).toBeNull();
+    expect(screen.queryByText(/저장된 메모/)).toBeNull();
+  });
+
+  it("renders a safe Korean title for an unregistered OTHER event type and never crashes on an unparseable detectedAt", () => {
+    const alerts = [
+      alert({ id: "other-1", eventType: "OTHER", detectedAt: "not-a-date" }),
+      alert({ id: "fall-1", eventType: "FALL_RISK", detectedAt: "2026-07-03T00:01:00.000Z" }),
+    ];
+
+    const { container } = render(
+      <RoomActionPanel space={spaces[1]} status={status("a", "DANGER")} alerts={alerts} onClose={vi.fn()} />,
+    );
+
+    expect(container.querySelectorAll("[data-event-type]")).toHaveLength(2);
+    // OTHER 로우는 안전한 한글 제목으로 대체된다 - raw eventType 코드가 화면에 노출되지 않는다.
+    expect(screen.queryByText("OTHER")).toBeNull();
   });
 });
 
@@ -429,7 +391,7 @@ describe("확인(ACK)과 해결 완료(RESOLVE)는 다른 동작이다 (I4)", ()
     vi.mocked(alertService.acknowledge).mockClear();
     renderPanel();
 
-    fireEvent.click(screen.getByRole("button", { name: "확인" }));
+    fireEvent.click(screen.getAllByRole("button", { name: "확인" })[0]);
 
     await waitFor(() => expect(alertService.acknowledge).toHaveBeenCalledWith("event-1"));
     expect(alertService.resolve).not.toHaveBeenCalled();
@@ -454,9 +416,9 @@ describe("확인(ACK)과 해결 완료(RESOLVE)는 다른 동작이다 (I4)", ()
       />,
     );
 
-    expect(
-      (screen.getByRole("button", { name: "확인" }) as HTMLButtonElement).disabled,
-    ).toBe(true);
+    for (const button of screen.getAllByRole("button", { name: "확인" }) as HTMLButtonElement[]) {
+      expect(button.disabled).toBe(true);
+    }
   });
 
   it("확인 후에도 패널이 열려 있어 해결 완료로 이어갈 수 있다", async () => {
@@ -466,7 +428,7 @@ describe("확인(ACK)과 해결 완료(RESOLVE)는 다른 동작이다 (I4)", ()
     vi.mocked(alertService.acknowledge).mockClear();
     renderPanel();
 
-    fireEvent.click(screen.getByRole("button", { name: "확인" }));
+    fireEvent.click(screen.getAllByRole("button", { name: "확인" })[0]);
     await waitFor(() => expect(alertService.acknowledge).toHaveBeenCalled());
 
     // 패널이 닫히지 않고, 해결 완료로 바로 이어갈 수 있다.
@@ -499,7 +461,7 @@ describe("ack-then-resolve-sequence — 확인 후 메모 없이도 해결할 �
     vi.mocked(alertService.resolve).mockClear();
     renderPanel();
 
-    fireEvent.click(screen.getByRole("button", { name: "확인" }));
+    fireEvent.click(screen.getAllByRole("button", { name: "확인" })[0]);
 
     await waitFor(() => expect(alertService.acknowledge).toHaveBeenCalledWith("event-1"));
     expect(alertService.resolve).not.toHaveBeenCalled();
@@ -532,7 +494,7 @@ describe("ack-then-resolve-sequence — 확인 후 메모 없이도 해결할 �
     vi.mocked(alertService.acknowledge).mockClear();
     renderPanel();
 
-    fireEvent.click(screen.getByRole("button", { name: "확인" }));
+    fireEvent.click(screen.getAllByRole("button", { name: "확인" })[0]);
     await waitFor(() => expect(alertService.acknowledge).toHaveBeenCalled());
 
     expect(screen.getByRole("button", { name: "해결 완료" })).toBeTruthy();

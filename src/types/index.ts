@@ -72,15 +72,6 @@ export type DetectionEventType =
   | "BED_EXIT"
   | "OTHER";
 
-export type ActionType =
-  | "ACKNOWLEDGED" // 확인 완료
-  | "STAFF_VISIT" // 직원 방문 중
-  | "HELP_REQUEST" // 도움 요청
-  | "NO_ISSUE" // 이상 없음
-  | "GUARDIAN_CONTACT" // 보호자 연락
-  | "HOSPITAL_TRANSFER" // 병원 이송
-  | "MEMO"; // 기타 메모
-
 // ---------- 엔티티 ----------
 
 export interface Facility {
@@ -169,18 +160,10 @@ export interface DetectionEvent {
   alertStatus: AlertLifecycleStatus;
   acknowledgedBy?: string;
   acknowledgedAt?: string;
-  actions: ActionLog[];
   confidence?: number; // AI 모델 신뢰도 (0~1)
   emergency?: boolean; // 응급 이벤트
 }
 
-export interface ActionLog {
-  id: string;
-  type: ActionType;
-  note?: string;
-  createdBy: string;
-  createdAt: string;
-}
 
 export interface AlertRule {
   id: string;

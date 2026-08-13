@@ -6,7 +6,7 @@ import { useMonitorSettingsStore } from "@/features/monitor/stores/monitorSettin
  * I5: 소리 알림 SSOT.
  *
  * 예전에는 `uiStore.soundEnabled`(기본 켜짐)와
- * `monitorSettingsStore.alertSound`(기본 꺼짐)가 따로 존재했다. StaffLayout
+ * `monitorSettingsStore.alertSound`(기본 켜짐)가 따로 존재했다. StaffLayout
  * 헤더는 앞의 것을 토글하고 실제 TTS는 뒤의 것을 읽어서, 화면은 "소리 알림
  * 켜짐"이라고 말하는데 낙상이 나도 소리가 안 났다.
  */

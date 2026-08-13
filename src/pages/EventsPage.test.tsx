@@ -33,7 +33,6 @@ const openEvent: DetectionEvent = {
   aiSummary: "미확인 이벤트 요약",
   detectedAt: "2026-07-14T00:00:00.000Z",
   alertStatus: "PENDING",
-  actions: [],
 };
 
 const acknowledgedEvent: DetectionEvent = {

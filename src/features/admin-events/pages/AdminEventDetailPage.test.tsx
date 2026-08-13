@@ -22,7 +22,7 @@ vi.mock("@/services/dashboardService", () => ({
 
 vi.mock("@/services/eventService", () => ({
   eventService: {
-    addAction: vi.fn(),
+    acknowledge: vi.fn(),
     getById: vi.fn(),
   },
 }));
@@ -46,7 +46,6 @@ const EVENT: DetectionEvent = {
   aiSummary: "위험 이벤트가 감지되었습니다.",
   detectedAt: "2026-07-16T00:00:10.000Z",
   alertStatus: "PENDING",
-  actions: [],
 };
 
 const DASHBOARD: DashboardResponse = {
@@ -90,6 +89,7 @@ function renderDetail(): void {
 }
 
 beforeEach(() => {
+  vi.clearAllMocks();
   vi.mocked(eventService.getById).mockResolvedValue(EVENT);
   vi.mocked(dashboardService.getDashboard).mockResolvedValue(DASHBOARD);
   vi.mocked(alertService.getMedia).mockResolvedValue({
@@ -168,68 +168,79 @@ describe("AdminEventDetailPage alert evidence integration", () => {
   });
 });
 
-describe("조치/메모 저장 실패를 침묵으로 넘기지 않는다", () => {
-  it("조치 저장이 거부되면 사유를 화면에 띄운다", async () => {
+describe("확인 완료 버튼", () => {
+  it("클릭하면 노트 없이 acknowledge 서비스를 호출한다", async () => {
+    vi.mocked(eventService.acknowledge).mockResolvedValueOnce({
+      ...EVENT,
+      alertStatus: "ACKNOWLEDGED",
+    });
+
+    renderDetail();
+
+    const ackBtn = await screen.findByRole("button", { name: "확인 완료" });
+    fireEvent.click(ackBtn);
+
+    await waitFor(() =>
+      expect(eventService.acknowledge).toHaveBeenCalledWith(EVENT.id, USER.name),
+    );
+    expect(vi.mocked(eventService.acknowledge).mock.calls[0]).toHaveLength(2);
+  });
+
+  it("미인증(user 없음) 상태에서는 버튼이 비활성화된다", async () => {
+    useAuthStore.setState({ user: null, initialized: true });
+
+    renderDetail();
+
+    const ackBtn = await screen.findByRole("button", { name: "확인 완료" });
+    expect((ackBtn as HTMLButtonElement).disabled).toBe(true);
+    expect(eventService.acknowledge).not.toHaveBeenCalled();
+  });
+
+  it("acknowledge가 거부되면 오류 문구를 화면에 띄운다", async () => {
     const { ApiError } = await import("@/services/apiClient");
-    vi.mocked(eventService.addAction).mockRejectedValueOnce(
+    vi.mocked(eventService.acknowledge).mockRejectedValueOnce(
       new ApiError(
         400,
         JSON.stringify({
           statusCode: 400,
-          message: "조치 결과를 먼저 기록해야 해결 완료로 바꿀 수 있습니다.",
+          message: "확인 완료로 바꿀 수 없습니다.",
         }),
       ),
     );
 
     renderDetail();
 
-    const input = await screen.findByPlaceholderText("메모를 입력하세요.");
-    fireEvent.change(input, { target: { value: "방문해 확인함" } });
-    fireEvent.click(screen.getByRole("button", { name: "확인 완료 처리" }));
+    const ackBtn = await screen.findByRole("button", { name: "확인 완료" });
+    fireEvent.click(ackBtn);
 
     const node = await screen.findByRole("alert");
-    expect(node.textContent).toContain("조치 결과를 먼저 기록");
+    expect(node.textContent).toContain("확인 완료로 바꿀 수 없습니다");
   });
 
   it("네트워크 오류도 문구로 알린다", async () => {
-    vi.mocked(eventService.addAction).mockRejectedValueOnce(new Error("network down"));
+    vi.mocked(eventService.acknowledge).mockRejectedValueOnce(new Error("network down"));
 
     renderDetail();
 
-    const input = await screen.findByPlaceholderText("메모를 입력하세요.");
-    fireEvent.change(input, { target: { value: "방문해 확인함" } });
-    fireEvent.click(screen.getByRole("button", { name: "확인 완료 처리" }));
+    const ackBtn = await screen.findByRole("button", { name: "확인 완료" });
+    fireEvent.click(ackBtn);
 
     const node = await screen.findByRole("alert");
     expect(node.textContent).toContain("조치를 저장하지 못했습니다");
   });
 
   it("성공하면 오류 문구가 남지 않는다", async () => {
-    vi.mocked(eventService.addAction).mockResolvedValueOnce(EVENT);
+    vi.mocked(eventService.acknowledge).mockResolvedValueOnce({
+      ...EVENT,
+      alertStatus: "ACKNOWLEDGED",
+    });
 
     renderDetail();
 
-    const input = await screen.findByPlaceholderText("메모를 입력하세요.");
-    fireEvent.change(input, { target: { value: "방문해 확인함" } });
-    fireEvent.click(screen.getByRole("button", { name: "확인 완료 처리" }));
+    const ackBtn = await screen.findByRole("button", { name: "확인 완료" });
+    fireEvent.click(ackBtn);
 
-    await waitFor(() => expect(eventService.addAction).toHaveBeenCalled());
+    await waitFor(() => expect(eventService.acknowledge).toHaveBeenCalled());
     expect(screen.queryByText(/저장하지 못했습니다/)).toBeNull();
-  });
-
-  it("실패해도 입력한 메모를 지우지 않는다", async () => {
-    // 실패했는데 작성 내용까지 사라지면 처음부터 다시 써야 한다.
-    vi.mocked(eventService.addAction).mockRejectedValueOnce(new Error("network down"));
-
-    renderDetail();
-
-    const input = (await screen.findByPlaceholderText(
-      "메모를 입력하세요.",
-    )) as HTMLTextAreaElement;
-    fireEvent.change(input, { target: { value: "방문해 확인함" } });
-    fireEvent.click(screen.getByRole("button", { name: "확인 완료 처리" }));
-
-    await screen.findByRole("alert");
-    expect(input.value).toBe("방문해 확인함");
   });
 });

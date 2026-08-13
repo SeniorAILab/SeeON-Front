@@ -36,7 +36,6 @@ function incident(id: string, eventType: "FALL_RISK" | "BED_EXIT"): DetectionEve
     aiSummary: "",
     detectedAt: "2026-08-12T00:00:00.000Z",
     alertStatus: "PENDING",
-    actions: [],
     emergency: eventType === "FALL_RISK",
   };
 }
@@ -56,7 +55,6 @@ function systemTest(): DetectionEvent {
     aiSummary: "SYSTEM TEST - NOT A RESIDENT ALERT",
     detectedAt: "2026-08-12T00:00:00.000Z",
     alertStatus: "PENDING",
-    actions: [],
     emergency: false,
     testMode: "SYSTEM_TEST",
     label: "SYSTEM TEST - NOT A RESIDENT ALERT",

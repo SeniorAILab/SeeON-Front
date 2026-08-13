@@ -190,7 +190,7 @@ describe("RoomActionPanel", () => {
       alert({ id: "fall-old", eventType: "FALL_RISK", detectedAt: "2026-07-03T00:01:00.000Z" }),
       alert({ id: "bed-1", eventType: "BED_EXIT", detectedAt: "2026-07-03T00:03:00.000Z" }),
       alert({ id: "wander-1", eventType: "WANDERING", detectedAt: "2026-07-03T00:02:00.000Z" }),
-      alert({ id: "fall-new", eventType: "FALL_RISK", detectedAt: "2026-07-03T00:04:00.000Z" }),
+      alert({ id: "wander-new", eventType: "WANDERING", detectedAt: "2026-07-03T00:04:00.000Z" }),
     ];
 
     const { container } = render(
@@ -199,13 +199,13 @@ describe("RoomActionPanel", () => {
 
     const rows = [...container.querySelectorAll("[data-event-type]")];
     expect(rows.map((row) => row.getAttribute("data-event-type"))).toEqual([
-      "FALL_RISK",
+      "WANDERING",
       "BED_EXIT",
       "WANDERING",
       "FALL_RISK",
     ]);
     expect(rows.map((row) => row.closest("li")?.getAttribute("data-event-type") ?? row.getAttribute("data-event-type"))).toEqual([
-      "FALL_RISK",
+      "WANDERING",
       "BED_EXIT",
       "WANDERING",
       "FALL_RISK",

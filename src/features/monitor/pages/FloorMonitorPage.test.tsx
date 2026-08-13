@@ -24,15 +24,16 @@ vi.mock("@/features/monitor/hooks/useTTSAlerts", () => ({
   buildTTSAlerts: vi.fn(() => []),
   useTTSAlerts: (...args: unknown[]) => useTTSAlertsMock(...args),
 }));
+const useRealtimeSpaceStatusMock = vi.fn((_facilityId: string, _spaces: unknown[]) => ({
+  statuses: {},
+  sortedSpaces: [],
+  summary: { totalSpaces: 0, stable: 0, caution: 0, danger: 0, checkNeeded: 0, unacknowledged: 0 },
+  totalPeople: 0,
+  connection: "CONNECTED" as const,
+  lastUpdateAt: null,
+}));
 vi.mock("@/features/monitor/hooks/useRealtimeSpaceStatus", () => ({
-  useRealtimeSpaceStatus: () => ({
-    statuses: {},
-    sortedSpaces: [],
-    summary: { totalSpaces: 0, stable: 0, caution: 0, danger: 0, checkNeeded: 0, unacknowledged: 0 },
-    totalPeople: 0,
-    connection: "CONNECTED",
-    lastUpdateAt: null,
-  }),
+  useRealtimeSpaceStatus: (facilityId: string, spaces: unknown[]) => useRealtimeSpaceStatusMock(facilityId, spaces),
 }));
 vi.mock("@/features/monitor/components/MonitorHeader", () => ({
   MonitorHeader: (props: unknown) => monitorHeaderMock(props),
@@ -45,6 +46,14 @@ vi.mock("@/services/dashboardService", () => ({ dashboardService: { getDashboard
 describe("FloorMonitorPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    useRealtimeSpaceStatusMock.mockReturnValue({
+      statuses: {},
+      sortedSpaces: [],
+      summary: { totalSpaces: 0, stable: 0, caution: 0, danger: 0, checkNeeded: 0, unacknowledged: 0 },
+      totalPeople: 0,
+      connection: "CONNECTED",
+      lastUpdateAt: null,
+    });
     useMonitorStore.setState({ dashboard: null, statuses: {}, loading: false });
     useAuthStore.setState({
       user: { id: "staff-1", name: "Care Staff", email: "staff@example.test", role: "STAFF", facilityId },
@@ -140,6 +149,40 @@ describe("FloorMonitorPage", () => {
       floors: [{ id: "fl_2f" }],
       showAllView: false,
     });
+  });
+
+  it("excludes spaces outside visibleSpaceIds from the spaces handed to the realtime hook (and the board)", async () => {
+    vi.mocked(dashboardService.getDashboard).mockResolvedValue({
+      facility: { id: facilityId, name: "행복요양원", address: "의정부시", phone: "031" },
+      floors: [{ id: "fl_2f", facilityId, name: "2F", orderIndex: 2, provisioningSource: "PRODUCT" }],
+      spaces: [
+        { id: "space-visible", facilityId, floorId: "fl_2f", name: "201호", type: "ROOM", capacity: 2, isActive: true, provisioningSource: "PRODUCT" },
+        { id: "space-hidden", facilityId, floorId: "fl_2f", name: "202호", type: "ROOM", capacity: 2, isActive: true, provisioningSource: "PRODUCT" },
+      ],
+      statuses: {},
+      summary: { totalSpaces: 0, stable: 0, caution: 0, danger: 0, checkNeeded: 0, unacknowledged: 0 },
+      unacknowledgedEvents: [],
+    });
+    useMonitorSettingsStore.setState({ visibleSpaceIds: ["space-visible"] });
+
+    render(<FloorMonitorPage />);
+
+    await waitFor(() => expect(useRealtimeSpaceStatusMock).toHaveBeenCalled());
+    const shownSpaces = useRealtimeSpaceStatusMock.mock.calls.at(-1)?.[1] ?? [];
+    expect(shownSpaces.map((s) => (s as { id: string }).id)).toEqual(["space-visible"]);
+    expect(shownSpaces.map((s) => (s as { id: string }).id)).not.toContain("space-hidden");
+  });
+
+  it("toggles the dark-mode wrapper class with the nightMode setting", async () => {
+    const { container, rerender } = render(<FloorMonitorPage />);
+
+    await waitFor(() => expect(roomStatusBoardMock).toHaveBeenCalled());
+    expect((container.firstChild as HTMLElement).className).toBe("");
+
+    useMonitorSettingsStore.setState({ nightMode: true });
+    rerender(<FloorMonitorPage />);
+
+    await waitFor(() => expect((container.firstChild as HTMLElement).className).toContain("dark"));
   });
 });
 

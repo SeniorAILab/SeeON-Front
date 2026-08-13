@@ -49,8 +49,9 @@ type Item = TTSAlertInput & {
 };
 interface Utterance {
   identity: string;
+  firstAnnouncement: boolean;
   priority: number;
-  ordinal: number;
+  seq: number;
   text: string;
 }
 
@@ -61,7 +62,7 @@ export class TTSManager {
   private speakingIdentity: string | null = null;
   private enabled = false;
   private timer: ReturnType<typeof setInterval> | null = null;
-  private nextOrdinal = 0;
+  private nextSeq = 0;
   private playbackGeneration = 0;
 
   private ensureTimer() {
@@ -110,15 +111,23 @@ export class TTSManager {
     for (const item of due) {
       const alreadyQueued = this.queue.some((utterance) => utterance.identity === item.identity);
       if (alreadyQueued || this.speakingIdentity === item.identity) continue;
+      // Capture the cohort before incrementing: first announcements cannot be
+      // starved by reannouncements from already-spoken active incidents.
+      const firstAnnouncement = item.announces === 0;
       this.queue.push({
         identity: item.identity,
+        firstAnnouncement,
         priority: PRIORITY[item.level],
-        ordinal: this.nextOrdinal++,
+        seq: this.nextSeq++,
         text: item.kind === "SYSTEM_TEST"
           ? item.ttsText
           : textFor(item.name, AUDIO_LEVEL[item.level]),
       });
-      this.queue.sort((a, b) => a.priority - b.priority || a.ordinal - b.ordinal);
+      this.queue.sort((a, b) =>
+        (a.firstAnnouncement === b.firstAnnouncement ? 0 : a.firstAnnouncement ? -1 : 1) ||
+        a.priority - b.priority ||
+        a.seq - b.seq
+      );
       const delay = REANNOUNCE_MS[Math.min(item.announces, REANNOUNCE_MS.length - 1)];
       item.announces += 1;
       item.nextAt = now + delay;

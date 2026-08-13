@@ -34,7 +34,6 @@ function alert(overrides: Partial<FrontendAlert> = {}): FrontendAlert {
     aiSummary: "침상 이탈이 감지되었습니다.",
     detectedAt: "2026-06-22T00:00:00.000Z",
     alertStatus: "PENDING",
-    actions: [],
     confidence: 0.91,
     emergency: true,
     backendStatus: "NEW",

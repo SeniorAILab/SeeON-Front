@@ -46,7 +46,6 @@ const EVENT: DetectionEvent = {
   aiSummary: "위험 이벤트가 감지되었습니다.",
   detectedAt: "2026-07-16T00:00:10.000Z",
   alertStatus: "PENDING",
-  actions: [],
 };
 
 const DASHBOARD: DashboardResponse = {

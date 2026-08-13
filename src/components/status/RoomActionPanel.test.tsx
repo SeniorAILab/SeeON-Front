@@ -45,7 +45,6 @@ function alert(overrides: Partial<DetectionEvent> = {}): DetectionEvent {
     aiSummary: "낙상 위험이 감지되었습니다.",
     detectedAt: "2026-07-03T00:00:00.000Z",
     alertStatus: "PENDING",
-    actions: [],
     ...overrides,
   };
 }

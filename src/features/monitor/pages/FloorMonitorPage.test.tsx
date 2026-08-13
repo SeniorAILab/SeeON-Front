@@ -101,7 +101,6 @@ describe("FloorMonitorPage", () => {
       aiSummary: "SYSTEM TEST - NOT A RESIDENT ALERT",
       detectedAt: "2026-08-12T00:00:00.000Z",
       alertStatus: "PENDING" as const,
-      actions: [],
       emergency: false,
     };
     useMonitorStore.setState({

@@ -8,7 +8,6 @@ import {
   resolveAlert,
   resolveAlertEndpoint,
   type AlertDto,
-  type BackendAlertDto,
 } from "./alertEndpoints";
 import { requestJson } from "@/services/apiClient";
 const SCOPED_FACILITY_ID = "fac_happy_nokyang";
@@ -116,62 +115,6 @@ describe("alertEndpoints", () => {
     expect(mapped.alertStatus).toBe("ACKNOWLEDGED");
   });
 
-  it("maps a facility-level SYSTEM_TEST without room, resident, camera, media, or probability assumptions", () => {
-    const dto = {
-      alertSeq: "15",
-      id: "alert-system-test-1",
-      backendEventId: "event-system-test-1",
-      facilityId: SCOPED_FACILITY_ID,
-      residentId: null,
-      cameraId: null,
-      spaceId: null,
-      room: null,
-      space: null,
-      type: "SYSTEM_TEST",
-      detectedAt: "2026-08-12T00:00:00.000Z",
-      status: "NEW",
-      testMode: "SYSTEM_TEST",
-      label: "SYSTEM TEST - NOT A RESIDENT ALERT",
-      ttsText: "System test emergency notification",
-    } as BackendAlertDto;
-
-    const mapped = mapAlertDto(dto);
-
-    expect(mapped).toMatchObject({
-      id: "alert-system-test-1",
-      backendEventId: "event-system-test-1",
-      spaceId: null,
-      residentId: null,
-      cameraId: null,
-      eventType: "SYSTEM_TEST",
-      backendType: "SYSTEM_TEST",
-      testMode: "SYSTEM_TEST",
-      label: "SYSTEM TEST - NOT A RESIDENT ALERT",
-      emergency: false,
-    });
-    expect(mapped.room).toBeUndefined();
-    expect(mapped.confidence).toBeUndefined();
-  });
-
-  it("rejects a SYSTEM_TEST payload that carries room or camera assumptions", () => {
-    expect(() => mapAlertDto({
-      alertSeq: "16",
-      id: "alert-system-test-invalid",
-      backendEventId: "event-system-test-invalid",
-      facilityId: SCOPED_FACILITY_ID,
-      residentId: null,
-      cameraId: "camera-not-allowed",
-      spaceId: null,
-      room: "room-not-allowed",
-      type: "SYSTEM_TEST",
-      detectedAt: "2026-08-12T00:00:00.000Z",
-      status: "NEW",
-      testMode: "SYSTEM_TEST",
-      label: "SYSTEM TEST - NOT A RESIDENT ALERT",
-      ttsText: "System test emergency notification",
-    } as unknown as BackendAlertDto)).toThrow("Invalid SYSTEM_TEST alert contract");
-  });
-
   it("keeps the backend event type string when the frontend domain maps it to OTHER", () => {
     const mapped = mapAlertDto({
       alertSeq: "14",
@@ -226,33 +169,6 @@ describe("alerts API seam", () => {
 
     expect(alert.status).toBe("NEW");
     expect(alert.alertStatus).toBe("PENDING");
-  });
-
-  it("maps a SYSTEM_TEST list item without inventing room or resident data", () => {
-    const alert = mapAlert({
-      alertSeq: "system-seq-1",
-      id: "alert-system-list-1",
-      backendEventId: "event-system-list-1",
-      facilityId: "f1",
-      residentId: null,
-      cameraId: null,
-      spaceId: null,
-      type: "SYSTEM_TEST",
-      detectedAt: "2026-08-12T00:00:00.000Z",
-      status: "NEW",
-      testMode: "SYSTEM_TEST",
-      label: "SYSTEM TEST - NOT A RESIDENT ALERT",
-      ttsText: "System test emergency notification",
-    } as unknown as AlertDto);
-
-    expect(alert).toMatchObject({
-      spaceId: null,
-      room: null,
-      residentName: null,
-      type: "SYSTEM_TEST",
-      testMode: "SYSTEM_TEST",
-      label: "SYSTEM TEST - NOT A RESIDENT ALERT",
-    });
   });
 
   it("maps an ACKED alert with legacy acknowledged badge and actor name", () => {

@@ -171,7 +171,7 @@ function deriveMergedStatuses(
     Object.entries(statuses).filter(([spaceId]) => activeSpaceIds.has(spaceId)),
   );
   const alerts = alertsForFacility(alertMergeState, activeFacilityId).filter((alert) =>
-    alert.spaceId !== null && activeSpaceIds.has(alert.spaceId),
+    activeSpaceIds.has(alert.spaceId),
   );
   return applyFreshness(deriveStatusesFromAlerts(activeStatuses, alerts));
 }
@@ -424,8 +424,13 @@ export const useMonitorStore = create<MonitorState>((set, get) => ({
     eventSource.onopen = markSseHealthy;
     run.alertListener = ((event: MessageEvent) => {
       if (!isCurrentRun(run)) return;
+      let alert: FrontendAlert;
+      try {
+        alert = mapAlertDto(JSON.parse(event.data));
+      } catch {
+        return;
+      }
       markSseHealthy();
-      const alert = mapAlertDto(JSON.parse(event.data));
       alertMergeState = mergeAlerts(alertMergeState, [alert]);
       set((state) => {
         const statuses = deriveMergedStatuses(state.dashboard, state.statuses);

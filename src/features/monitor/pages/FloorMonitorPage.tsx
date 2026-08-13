@@ -4,7 +4,6 @@ import { Navigate, useParams } from "react-router-dom";
 import { MonitorHeader } from "@/features/monitor/components/MonitorHeader";
 
 import { RoomStatusBoard } from "@/components/status/RoomStatusBoard";
-import { SystemTestAlertBanner } from "@/components/status/SystemTestAlertBanner";
 import { dashboardService } from "@/services/dashboardService";
 import { useRealtimeSpaceStatus } from "@/features/monitor/hooks/useRealtimeSpaceStatus";
 import { useTTSAlerts, buildTTSAlerts } from "@/features/monitor/hooks/useTTSAlerts";
@@ -97,15 +96,10 @@ export function FloorMonitorPage({ allView = false }: { allView?: boolean }) {
   const alertsBySpace = useMemo(() => {
     const groups: Record<string, NonNullable<typeof dashboard>["unacknowledgedEvents"]> = {};
     for (const alert of activeAlerts) {
-      if (!alert.spaceId || alert.testMode === "SYSTEM_TEST") continue;
       groups[alert.spaceId] = [...(groups[alert.spaceId] ?? []), alert];
     }
     return groups;
   }, [activeAlerts]);
-  const systemTestAlerts = useMemo(
-    () => activeAlerts.filter((alert) => alert.testMode === "SYSTEM_TEST"),
-    [activeAlerts],
-  );
 
   // 연결이 끊긴 방. 상단 가로 배너 대신 헤더 벨 배지로만 알린다.
   const disconnectedRooms = useMemo(
@@ -199,28 +193,22 @@ export function FloorMonitorPage({ allView = false }: { allView?: boolean }) {
           disconnectedRooms={disconnectedRooms}
         />
 
-        <div className="mt-4 flex min-h-0 flex-1 flex-col gap-3">
-          <SystemTestAlertBanner
-            alerts={systemTestAlerts}
-            surface="monitor-system-test-banner:focus"
+        <div className="mt-4 flex min-h-0 flex-1">
+          <RoomStatusBoard
+            spaces={sortedSpaces}
+            statuses={statuses}
+            floors={floors}
+            alertsBySpace={alertsBySpace}
+            connection={connection}
+            lastUpdateAt={lastUpdateAt}
+            variant="staff"
+            layout={allView ? "overview" : "focus"}
+            cardSize={cardSize}
+            selectedSpace={selected}
+            onSelectSpace={setSelected}
+            onClosePanel={() => setSelected(null)}
+            onResolved={() => void reload()}
           />
-          <div className="flex min-h-0 flex-1">
-            <RoomStatusBoard
-              spaces={sortedSpaces}
-              statuses={statuses}
-              floors={floors}
-              alertsBySpace={alertsBySpace}
-              connection={connection}
-              lastUpdateAt={lastUpdateAt}
-              variant="staff"
-              layout={allView ? "overview" : "focus"}
-              cardSize={cardSize}
-              selectedSpace={selected}
-              onSelectSpace={setSelected}
-              onClosePanel={() => setSelected(null)}
-              onResolved={() => void reload()}
-            />
-          </div>
         </div>
 
 

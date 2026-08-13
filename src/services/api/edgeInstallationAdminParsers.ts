@@ -4,11 +4,7 @@ import type {
   OwnershipTransferKind,
 } from "./edgeEnrollmentTypes";
 import { EdgeEnrollmentResponseError } from "./edgeEnrollmentTypes";
-import type {
-  EdgeOwnershipTransfer,
-  EdgeValidationEventSummary,
-  EdgeValidationRun,
-} from "./edgeInstallationAdminTypes";
+import type { EdgeOwnershipTransfer } from "./edgeInstallationAdminTypes";
 import {
   readInstant,
   readNonnegativeInteger,
@@ -20,54 +16,6 @@ import {
   requireExactKeys,
   requireSchemaVersion,
 } from "./edgeEnrollmentValidation";
-
-export function parseEdgeValidationRun(value: unknown): EdgeValidationRun {
-  const record = readRecord(value, "root");
-  requireExactKeys(record, [
-    "schemaVersion",
-    "operation",
-    "validationRunId",
-    "edgeInstallationId",
-    "enrollmentGeneration",
-    "status",
-    "createdAt",
-    "expiresAt",
-  ]);
-  requireSchemaVersion(record);
-  if (readString(record, "status") !== "ACTIVE") {
-    throw new EdgeEnrollmentResponseError("validation status must be ACTIVE");
-  }
-  return {
-    operation: parseOperation(record.operation),
-    validationRunId: readUuidV7(record, "validationRunId"),
-    edgeInstallationId: readUuid(record, "edgeInstallationId"),
-    enrollmentGeneration: readPositiveInteger(
-      record,
-      "enrollmentGeneration",
-    ),
-    status: "ACTIVE",
-    createdAt: readInstant(record, "createdAt"),
-    expiresAt: readInstant(record, "expiresAt"),
-  };
-}
-
-export function parseEdgeValidationEvents(
-  value: unknown,
-): readonly EdgeValidationEventSummary[] {
-  const record = readRecord(value, "root");
-  requireExactKeys(record, ["schemaVersion", "items"]);
-  requireSchemaVersion(record);
-  if (!Array.isArray(record.items)) {
-    throw new EdgeEnrollmentResponseError("items must be an array");
-  }
-  return record.items.map((item) => {
-    const event = readRecord(item, "validation event");
-    return {
-      id: readUuid(event, "id"),
-      detectedAt: readInstant(event, "detectedAt"),
-    };
-  });
-}
 
 export function parseEdgeOwnershipTransfer(
   value: unknown,

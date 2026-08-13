@@ -121,7 +121,7 @@ export function AlertsPage() {
                 onClick={() => acknowledge(alert)}
                 className="min-h-[56px] rounded-xl bg-brand px-6 text-staff-btn text-white disabled:opacity-60"
               >
-                {alert.testMode === "SYSTEM_TEST" ? "테스트 확인" : "확인하러 갑니다"}
+                확인하러 갑니다
               </button>
             )}
           />
@@ -131,7 +131,7 @@ export function AlertsPage() {
             empty="확인된 알림이 없습니다."
             alerts={grouped.ACKED}
             renderMeta={(alert) =>
-              alertMeta(alert, `${alert.ackedByName ?? "직원"} 확인 · ${formatDateTime(alert.ackedAt ?? alert.detectedAt)}`)
+              `${alert.ackedByName ?? "직원"} 확인 · ${formatDateTime(alert.ackedAt ?? alert.detectedAt)} · ${alert.room}`
             }
             renderAction={(alert) => (
               <button
@@ -139,7 +139,7 @@ export function AlertsPage() {
                 onClick={() => resolve(alert)}
                 className="min-h-[56px] rounded-xl bg-status-stable px-6 text-staff-btn text-white disabled:opacity-60"
               >
-                {alert.testMode === "SYSTEM_TEST" ? "테스트 종료" : "현장 확인 완료"}
+                현장 확인 완료
               </button>
             )}
           />
@@ -149,9 +149,9 @@ export function AlertsPage() {
             empty="해결된 알림이 없습니다."
             alerts={grouped.RESOLVED}
             renderMeta={(alert) =>
-              alertMeta(alert, `${alert.resolvedByName ?? "직원"} 해결 · ${formatDateTime(
+              `${alert.resolvedByName ?? "직원"} 해결 · ${formatDateTime(
                 alert.resolvedAt ?? alert.detectedAt
-              )}`)
+              )} · ${alert.room}`
             }
           />
         </div>
@@ -195,11 +195,6 @@ function AlertSection({
             return (
               <div
                 key={alert.id}
-                data-alert-id={alert.id}
-                data-backend-event-id={alert.backendEventId ?? undefined}
-                data-correlation-id={alert.backendEventId ?? alert.id}
-                data-test-mode={alert.testMode}
-                data-status={alert.testMode === "SYSTEM_TEST" ? "SYSTEM_TEST" : alert.status}
                 className={cn(
                   "flex flex-wrap items-center gap-4 rounded-2xl border border-border bg-surface p-5 shadow-card",
                   pulseClassFor?.(alert)
@@ -231,10 +226,6 @@ function AlertSection({
       )}
     </section>
   );
-}
-
-function alertMeta(alert: AlertView, prefix: string): string {
-  return alert.testMode === "SYSTEM_TEST" ? prefix : `${prefix} · ${alert.room ?? "공간"}`;
 }
 
 function errorMessage(err: unknown): string {

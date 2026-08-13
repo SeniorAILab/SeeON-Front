@@ -92,44 +92,6 @@ describe("FloorMonitorPage", () => {
 
     await waitFor(() => expect(useTTSAlertsMock).toHaveBeenLastCalledWith([], true));
   });
-  it("wires facility-level SYSTEM_TEST alerts to the banner and identity TTS builder", async () => {
-    const systemAlert = {
-      id: "alert-system-monitor",
-      backendEventId: "event-system-monitor",
-      alertSeq: "30",
-      facilityId,
-      spaceId: null,
-      residentId: null,
-      cameraId: null,
-      eventType: "SYSTEM_TEST" as const,
-      testMode: "SYSTEM_TEST" as const,
-      label: "SYSTEM TEST - NOT A RESIDENT ALERT" as const,
-      ttsText: "System test emergency notification" as const,
-      riskLevel: "LOW" as const,
-      message: "SYSTEM TEST - NOT A RESIDENT ALERT",
-      aiSummary: "SYSTEM TEST - NOT A RESIDENT ALERT",
-      detectedAt: "2026-08-12T00:00:00.000Z",
-      alertStatus: "PENDING" as const,
-      emergency: false,
-    };
-    useMonitorStore.setState({
-      dashboard: {
-        facility: { id: facilityId, name: "테스트 시설", address: "", phone: "" },
-        floors: [],
-        spaces: [],
-        statuses: {},
-        summary: { totalSpaces: 0, stable: 0, caution: 0, danger: 0, checkNeeded: 0, unacknowledged: 1 },
-        unacknowledgedEvents: [systemAlert],
-      },
-    });
-    const { buildTTSAlerts } = await import("@/features/monitor/hooks/useTTSAlerts");
-
-    render(<FloorMonitorPage />);
-
-    expect(await screen.findByText("SYSTEM TEST")).toBeTruthy();
-    await waitFor(() => expect(buildTTSAlerts).toHaveBeenCalledWith([], {}, expect.any(Array), [systemAlert]));
-  });
-
   it("redirects legacy all-view settings to a configured floor when all-view is disabled", async () => {
     useMonitorSettingsStore.setState({ allowAllView: false, defaultFloorId: "all" });
 

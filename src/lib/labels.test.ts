@@ -55,7 +55,6 @@ describe("eventTypeLabel", () => {
 
 describe("detectionEventPresentationFor", () => {
   const allEventTypes: DetectionEventType[] = [
-    "SYSTEM_TEST",
     "STABLE",
     "MOVEMENT_INCREASE",
     "REPEATED_STANDING_ATTEMPT",
@@ -71,12 +70,7 @@ describe("detectionEventPresentationFor", () => {
     for (const eventType of allEventTypes) {
       const presentation = detectionEventPresentationFor(eventType);
       expect(presentation.icon).toBeTruthy();
-      // SYSTEM_TEST uses English sentinel; all others must be Korean
-      if (eventType !== "SYSTEM_TEST") {
-        expect(presentation.title).toMatch(/[가-힣]/);
-      } else {
-        expect(presentation.title).toBe("SYSTEM TEST");
-      }
+      expect(presentation.title).toMatch(/[가-힣]/);
       expect(presentation.phrase).toBeTruthy();
     }
   });

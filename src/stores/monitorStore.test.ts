@@ -326,16 +326,13 @@ describe("monitorStore live alert merge", () => {
       backendEventId: "unsupported-backend-event",
       facilityId: SCOPED_FACILITY_ID,
       residentId: null,
-      cameraId: null,
-      spaceId: null,
-      room: null,
+      cameraId: "cam_sp_201",
+      spaceId: "sp_201",
+      room: "201호",
       type: "SYSTEM_TEST",
-      probability: null,
+      probability: 0.95,
       detectedAt: "2026-08-13T00:00:00.000Z",
       status: "NEW",
-      testMode: "SYSTEM_TEST",
-      label: "unsupported-sentinel",
-      ttsText: "unsupported-sentinel",
     })).not.toThrow();
 
     const after = useMonitorStore.getState();

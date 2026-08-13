@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  listAlerts,
   listAlertsEndpoint,
   listAllAlerts,
   mapAlert,
@@ -18,6 +19,22 @@ vi.mock("@/services/apiClient", () => ({
 }));
 
 const requestJsonMock = vi.mocked(requestJson);
+
+const retiredOperationalDto = {
+  alertSeq: "retired-15",
+  id: "alert-retired-15",
+  backendEventId: "event-retired-15",
+  facilityId: SCOPED_FACILITY_ID,
+  residentId: null,
+  cameraId: "cam_sp_201",
+  spaceId: "sp_201",
+  room: "201호",
+  type: "SYSTEM_TEST",
+  probability: 0.95,
+  snapshotKey: null,
+  detectedAt: "2026-08-13T00:00:00.000Z",
+  status: "NEW",
+} as const;
 
 describe("alertEndpoints", () => {
   it("maps backend bed-exit alerts to frontend domain alerts", () => {
@@ -113,6 +130,10 @@ describe("alertEndpoints", () => {
 
     expect(mapped.backendStatus).toBe("RESOLVED");
     expect(mapped.alertStatus).toBe("ACKNOWLEDGED");
+  });
+
+  it("rejects the retired discriminator before the unknown operational fallback", () => {
+    expect(() => mapAlertDto(retiredOperationalDto)).toThrow();
   });
 
   it("keeps the backend event type string when the frontend domain maps it to OTHER", () => {
@@ -239,6 +260,12 @@ describe("alerts API seam", () => {
 
     await expect(listAlertsEndpoint()).rejects.toThrow("Malformed alert response");
   });
+
+  it("rejects the retired discriminator from the alert-view REST array", async () => {
+    requestJsonMock.mockResolvedValue([retiredOperationalDto]);
+
+    await expect(listAlertsEndpoint()).rejects.toThrow();
+  });
 });
 
 describe("mapAlertDto/mapAlert alertStatus equivalence", () => {
@@ -363,6 +390,15 @@ describe("listAllAlerts — 목록이 서버 기본값에서 잘리지 않는다
     const secondUrl = requestJsonMock.mock.calls[1]?.[0] as string;
     expect(secondUrl).toContain("beforeSeq=171");
     expect(secondUrl).toContain("limit=200");
+  });
+
+  it("rejects the retired discriminator from REST arrays and paged history", async () => {
+    requestJsonMock.mockResolvedValue([retiredOperationalDto]);
+    await expect(listAlerts()).rejects.toThrow();
+
+    requestJsonMock.mockReset();
+    requestJsonMock.mockResolvedValue([retiredOperationalDto]);
+    await expect(listAllAlerts()).rejects.toThrow();
   });
 
   it("첫 장이 덜 찼으면 한 번만 부른다", async () => {

@@ -167,12 +167,6 @@ const detectionEventPresentationRegistry: Record<DetectionEventType, EventPresen
     severity: "medium",
     phrase: "모든 것이 정상입니다",
   },
-  SYSTEM_TEST: {
-    icon: FlaskConical,
-    title: "SYSTEM TEST",
-    severity: "medium",
-    phrase: "시스템 기능 점검 알림입니다",
-  },
   OTHER: {
     icon: HelpCircle,
     title: "기타 감지",

@@ -113,7 +113,7 @@ export function AlertsPage() {
             title="확인 필요"
             empty="확인할 새 알림이 없습니다."
             alerts={grouped.NEW}
-            renderMeta={(alert) => alertMeta(alert, formatDateTime(alert.detectedAt))}
+            renderMeta={(alert) => `${formatDateTime(alert.detectedAt)} · ${alert.room ?? "공간"}`}
             pulseClassFor={(alert) => (pulsingIds.has(alert.id) ? "animate-pulse-alert-new motion-reduce:animate-none" : "")}
             renderAction={(alert) => (
               <button

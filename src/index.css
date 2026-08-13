@@ -2,6 +2,22 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer components {
+  .page-grid {
+    display: grid;
+    grid-template-columns: 1fr minmax(0, 64rem) 1fr;
+  }
+  .page-grid > * {
+    grid-column: 2;
+    min-width: 0;
+    padding-inline: 1rem;
+  }
+  .page-bleed {
+    grid-column: 1 / -1;
+    padding-inline: 0;
+  }
+}
+
 /* =============================================================
    라이트/다크 테마 토큰 (CSS 변수)
    - 컴포넌트는 bg-surface, text-ink 등 토큰 클래스만 사용

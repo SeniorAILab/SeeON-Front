@@ -123,6 +123,34 @@ describe("FloorSelectLandingPage", () => {
     await screen.findByRole("list", { name: "층 선택 목록" });
     expect(screen.queryByRole("button", { name: "전체 보기 이동, 위험 1건" })).toBeNull();
   });
+
+  it("(4d) sorts the danger-bearing floor's card first in the floor list, even when its floor number is higher", async () => {
+    const dangerHighFloorId = "fl_3f";
+    vi.mocked(dashboardService.getDashboard).mockResolvedValue({
+      ...dashboard,
+      floors: [
+        ...dashboard.floors,
+        { id: dangerHighFloorId, facilityId, name: "3층", orderIndex: 3, provisioningSource: "PRODUCT" },
+      ],
+      spaces: [
+        { id: "space_101", facilityId, floorId: dangerFloorId, name: "101호", type: "ROOM", capacity: 2, isActive: true, provisioningSource: "PRODUCT" },
+        { id: "space_201", facilityId, floorId: stableFloorId, name: "201호", type: "ROOM", capacity: 2, isActive: true, provisioningSource: "PRODUCT" },
+        { id: "space_301", facilityId, floorId: dangerHighFloorId, name: "301호", type: "ROOM", capacity: 2, isActive: true, provisioningSource: "PRODUCT" },
+      ],
+      statuses: {
+        space_101: status("space_101", "STABLE"),
+        space_201: status("space_201", "STABLE"),
+        space_301: status("space_301", "DANGER"),
+      },
+    });
+
+    render(<FloorSelectLandingPage />);
+
+    const floorList = await screen.findByRole("list", { name: "층 선택 목록" });
+    const cards = within(floorList).getAllByRole("listitem");
+    expect(within(cards[0]).getByRole("button", { name: "3층 이동, 위험 1건" })).toBeTruthy();
+  });
+
   it("does not offer floors that contain only inactive spaces", async () => {
     const inactiveFloorId = "fl_hidden";
     vi.mocked(dashboardService.getDashboard).mockResolvedValue({
@@ -150,5 +178,37 @@ describe("FloorSelectLandingPage", () => {
 
     await screen.findByRole("list", { name: "층 선택 목록" });
     expect(screen.queryByRole("button", { name: "숨김층 이동, 위험 0건" })).toBeNull();
+  });
+
+  const breakoutClassPattern = /left-1\/2|w-screen|-translate-x-1\/2|calc\(100dvh-9\.5rem\)/;
+
+  it("renders the main content branch on the shell's page-bleed track, not a viewport breakout", async () => {
+    render(<FloorSelectLandingPage />);
+
+    const heading = await screen.findByRole("heading", { name: "층 선택" });
+    const section = heading.closest("section");
+    expect(section).not.toBeNull();
+    expect(section?.className).toMatch(/\bpage-bleed\b/);
+    expect(section?.className ?? "").not.toMatch(breakoutClassPattern);
+  });
+
+  it("renders the loading branch on the shell's page-bleed track, not a viewport breakout", () => {
+    vi.mocked(dashboardService.getDashboard).mockReturnValue(new Promise(() => {}));
+    render(<FloorSelectLandingPage />);
+
+    const loading = screen.getByText("층 선택 화면을 준비하는 중...");
+    expect(loading.className).toMatch(/\bpage-bleed\b/);
+    expect(loading.className).not.toMatch(breakoutClassPattern);
+  });
+
+  it("renders the error branch on the shell's page-bleed track, not a viewport breakout", async () => {
+    vi.mocked(dashboardService.getDashboard).mockRejectedValue(new Error("boom"));
+    render(<FloorSelectLandingPage />);
+
+    const errorText = await screen.findByText("층 정보를 불러오지 못했습니다.");
+    const errorRoot = errorText.parentElement;
+    expect(errorRoot).not.toBeNull();
+    expect(errorRoot?.className).toMatch(/\bpage-bleed\b/);
+    expect(errorRoot?.className ?? "").not.toMatch(breakoutClassPattern);
   });
 });

@@ -1,5 +1,5 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FloorMonitorPage } from "./FloorMonitorPage";
 import { useAuthStore } from "@/stores/authStore";
 import { useFacilityStore } from "@/stores/facilityStore";
@@ -141,6 +141,125 @@ describe("FloorMonitorPage", () => {
       floors: [{ id: "fl_2f" }],
       showAllView: false,
     });
+  });
+});
+
+describe("FloorMonitorPage — allView-keyed surface sizing", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useMonitorStore.setState({ dashboard: null, statuses: {}, loading: false });
+    useAuthStore.setState({
+      user: { id: "staff-1", name: "Care Staff", email: "staff@example.test", role: "STAFF", facilityId },
+      loading: false,
+      error: null,
+      initialized: true,
+    });
+    useFacilityStore.setState({ currentFacilityId: null });
+    useMonitorSettingsStore.setState({
+      defaultFloorId: "fl_2f",
+      refreshMs: 6000,
+      alertSound: false,
+      nightMode: false,
+      cardSize: "xl",
+      visibleSpaceIds: null,
+      allowAllView: true,
+    });
+    vi.mocked(dashboardService.getDashboard).mockResolvedValue({
+      facility: { id: facilityId, name: "행복요양원", address: "의정부시", phone: "031" },
+      floors: [{ id: "fl_2f", facilityId, name: "2F", orderIndex: 2, provisioningSource: "PRODUCT" }],
+      spaces: [],
+      statuses: {},
+      summary: { totalSpaces: 0, stable: 0, caution: 0, danger: 0, checkNeeded: 0, unacknowledged: 0 },
+      unacknowledgedEvents: [],
+    });
+  });
+
+  afterEach(() => {
+    Object.defineProperty(document, "fullscreenElement", {
+      configurable: true,
+      value: null,
+    });
+  });
+
+  it("regression: the guessed height cage (100dvh minus a fixed rem constant) and w-screen hack never come back", async () => {
+    render(<FloorMonitorPage />);
+
+    const surface = await screen.findByTestId("monitor-surface");
+    expect(surface.style.height).not.toContain("rem");
+    expect(surface.className).not.toContain("w-screen");
+    expect(surface.className).not.toContain("-translate-x-1/2");
+  });
+
+  it("overview (allView) has no inline height and no overflow/width-hack classes", async () => {
+    render(<FloorMonitorPage allView />);
+
+    const surface = await screen.findByTestId("monitor-surface");
+    expect(surface.style.height).toBe("");
+    expect(surface.className).not.toContain("overflow-hidden");
+    expect(surface.className).not.toContain("w-screen");
+    expect(surface.className).not.toContain("-translate-x-1/2");
+  });
+
+  it("per-floor (focus) keeps overflow-hidden on the surface and h-full on the nightMode root", async () => {
+    render(<FloorMonitorPage />);
+
+    const surface = await screen.findByTestId("monitor-surface");
+    expect(surface.className).toContain("overflow-hidden");
+    expect(surface.parentElement?.className).toContain("h-full");
+  });
+
+  it("never renders the -translate-x-1/2 hack in either mode", async () => {
+    const { unmount } = render(<FloorMonitorPage allView />);
+    await screen.findByTestId("monitor-surface");
+    expect(document.querySelector('[class*="-translate-x-1/2"]')).toBeNull();
+    unmount();
+
+    render(<FloorMonitorPage />);
+    await screen.findByTestId("monitor-surface");
+    expect(document.querySelector('[class*="-translate-x-1/2"]')).toBeNull();
+  });
+
+  it("focus mode reads fullscreenchange to switch between h-full and 100dvh", async () => {
+    Object.defineProperty(document, "fullscreenElement", {
+      configurable: true,
+      value: null,
+    });
+
+    render(<FloorMonitorPage />);
+
+    const surface = await screen.findByTestId("monitor-surface");
+    expect(surface.style.height).toBe("");
+
+    Object.defineProperty(document, "fullscreenElement", {
+      configurable: true,
+      value: document.body,
+    });
+    await act(async () => {
+      document.dispatchEvent(new Event("fullscreenchange"));
+    });
+
+    expect(surface.style.height).toBe("100dvh");
+  });
+
+  it("overview mode ignores fullscreen and keeps no inline height", async () => {
+    Object.defineProperty(document, "fullscreenElement", {
+      configurable: true,
+      value: null,
+    });
+
+    render(<FloorMonitorPage allView />);
+
+    const surface = await screen.findByTestId("monitor-surface");
+
+    Object.defineProperty(document, "fullscreenElement", {
+      configurable: true,
+      value: document.body,
+    });
+    await act(async () => {
+      document.dispatchEvent(new Event("fullscreenchange"));
+    });
+
+    expect(surface.style.height).toBe("");
   });
 });
 

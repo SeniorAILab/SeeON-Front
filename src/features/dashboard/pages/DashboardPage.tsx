@@ -130,21 +130,19 @@ export function DashboardPage() {
           조건에 맞는 공간이 없습니다.
         </div>
       ) : (
-        <div className="h-[70vh] min-h-[520px] overflow-hidden">
-          <RoomStatusBoard
-            spaces={visibleSpaces}
-            statuses={data.statuses}
-            floors={data.floors}
-            alertsBySpace={alertsBySpace}
-            connection={connection}
-            lastUpdateAt={lastUpdateAt}
-            variant="admin"
-            selectedSpace={selected}
-            onSelectSpace={setSelected}
-            onClosePanel={() => setSelected(null)}
-            onResolved={reload}
-          />
-        </div>
+        <RoomStatusBoard
+          spaces={visibleSpaces}
+          statuses={data.statuses}
+          floors={data.floors}
+          alertsBySpace={alertsBySpace}
+          connection={connection}
+          lastUpdateAt={lastUpdateAt}
+          variant="admin"
+          selectedSpace={selected}
+          onSelectSpace={setSelected}
+          onClosePanel={() => setSelected(null)}
+          onResolved={reload}
+        />
       )}
 
     </div>

@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { RoomStatusTreemap, heroTileStyle } from "./RoomStatusTreemap";
+import { RoomStatusTreemap, groupRoomsByFloor, heroTileStyle } from "./RoomStatusTreemap";
 import type { DetectionEvent, Floor, Space, SpaceStatus } from "@/types";
 
 const { recordDashboardPresentationMock } = vi.hoisted(() => ({
@@ -218,6 +218,28 @@ describe("RoomStatusTreemap layout grid behavior", () => {
     expect(cautionTile?.className).not.toContain("animate-pulse-safe");
     expect(cautionTile?.className).not.toContain("animate-pulse-danger");
     expect(container.querySelector('button[aria-label="204호 주의"] span[class*="animate-"]')).toBeNull();
+  });
+});
+
+describe("RoomStatusTreemap root container flow (todo 5)", () => {
+  const dangerSpace = space("danger-room", "202호");
+  const spaces = [dangerSpace];
+  const statuses: Record<string, SpaceStatus> = {
+    [dangerSpace.id]: status(dangerSpace.id, "DANGER", "낙상 위험 감지"),
+  };
+
+  it("overview root className contains neither overflow-auto nor h-full nor the pr-1 scrollbar gutter", () => {
+    const { container } = render(<RoomStatusTreemap spaces={spaces} floors={floors} statuses={statuses} layout="overview" />);
+    const root = container.querySelector('[role="list"][aria-label="방 상태 히트맵"]');
+    expect(root?.className).not.toContain("overflow-auto");
+    expect(root?.className).not.toContain("h-full");
+    expect(root?.className).not.toContain("pr-1");
+  });
+
+  it("focus root className stays byte-identical: overflow-hidden and h-full remain", () => {
+    const { container } = render(<RoomStatusTreemap spaces={spaces} floors={floors} statuses={statuses} layout="focus" />);
+    const root = container.querySelector('[role="list"][aria-label="방 상태 히트맵"]');
+    expect(root?.className).toBe("flex h-full w-full flex-col gap-4 overflow-hidden");
   });
 });
 
@@ -456,6 +478,65 @@ describe("RoomStatusTreemap — 연결 끊김 표시(직교)", () => {
         expect(tile.getAttribute("data-connection")).toBe("STALE");
         unmount();
       }
+    });
+  });
+
+  describe("groupRoomsByFloor risk-first ordering", () => {
+    const riskyFloors: Floor[] = [
+      { id: "f1", facilityId: "fac", name: "1F", orderIndex: 1, provisioningSource: "PRODUCT" },
+      { id: "f2", facilityId: "fac", name: "2F", orderIndex: 2, provisioningSource: "PRODUCT" },
+      { id: "f3", facilityId: "fac", name: "3F", orderIndex: 3, provisioningSource: "PRODUCT" },
+    ];
+
+    function roomOn(floorId: string, id: string, name: string) {
+      return { ...space(id, name), floorId };
+    }
+
+    it("(4a) sorts a floor whose only DANGER room exists above a lower-numbered all-STABLE floor", () => {
+      const stableRoomF1 = roomOn("f1", "r1", "101호");
+      const dangerRoomF3 = roomOn("f3", "r3", "301호");
+      const groups = groupRoomsByFloor(
+        [stableRoomF1, dangerRoomF3],
+        {
+          [stableRoomF1.id]: status(stableRoomF1.id, "STABLE", ""),
+          [dangerRoomF3.id]: status(dangerRoomF3.id, "DANGER", ""),
+        },
+        riskyFloors,
+      );
+
+      expect(groups.map((group) => group.floorName)).toEqual(["3F", "1F"]);
+    });
+
+    it("(4b) keeps orderIndex order between two floors of equal risk", () => {
+      const dangerRoomF2 = roomOn("f2", "r2", "201호");
+      const dangerRoomF3 = roomOn("f3", "r3", "301호");
+      const groups = groupRoomsByFloor(
+        [dangerRoomF3, dangerRoomF2],
+        {
+          [dangerRoomF2.id]: status(dangerRoomF2.id, "DANGER", ""),
+          [dangerRoomF3.id]: status(dangerRoomF3.id, "DANGER", ""),
+        },
+        riskyFloors,
+      );
+
+      expect(groups.map((group) => group.floorName)).toEqual(["2F", "3F"]);
+    });
+
+    it("(4e) leaves an all-STABLE fixture's order identical to plain orderIndex order (sort is inert without risk)", () => {
+      const roomF1 = roomOn("f1", "r1", "101호");
+      const roomF2 = roomOn("f2", "r2", "201호");
+      const roomF3 = roomOn("f3", "r3", "301호");
+      const groups = groupRoomsByFloor(
+        [roomF3, roomF1, roomF2],
+        {
+          [roomF1.id]: status(roomF1.id, "STABLE", ""),
+          [roomF2.id]: status(roomF2.id, "STABLE", ""),
+          [roomF3.id]: status(roomF3.id, "STABLE", ""),
+        },
+        riskyFloors,
+      );
+
+      expect(groups.map((group) => group.floorName)).toEqual(["1F", "2F", "3F"]);
     });
   });
 

@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { playTTS } from "./playTTS";
-import { TTSManager, type TTSIncidentAlertInput } from "./ttsManager";
+import {
+  TTSManager,
+  retryPendingTTSFromTrustedInteraction,
+  ttsManager,
+  type TTSIncidentAlertInput,
+} from "./ttsManager";
 
 vi.mock("./playTTS", () => ({
   playTTS: vi.fn(() => Promise.resolve({ ok: true })),
@@ -8,6 +13,24 @@ vi.mock("./playTTS", () => ({
 }));
 
 const playTTSMock = vi.mocked(playTTS);
+
+describe("trusted TTS retry boundary", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it("retries exactly once for a trusted interaction", () => {
+    const retry = vi.spyOn(ttsManager, "retryPendingOnUserGesture");
+
+    expect(retryPendingTTSFromTrustedInteraction({ isTrusted: true })).toBe(true);
+    expect(retry).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects scripted interactions without retrying", () => {
+    const retry = vi.spyOn(ttsManager, "retryPendingOnUserGesture");
+
+    expect(retryPendingTTSFromTrustedInteraction({ isTrusted: false })).toBe(false);
+    expect(retry).not.toHaveBeenCalled();
+  });
+});
 
 function deferred<T>() {
   let resolve!: (value: T) => void;

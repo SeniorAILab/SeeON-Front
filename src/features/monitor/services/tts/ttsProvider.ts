@@ -11,7 +11,7 @@ export interface SpeakOptions {
   volume?: number;
 }
 
-/** 발화 실패 사유. autoplay 차단은 다음 실제 사용자 상호작용에서 즉시 재시도한다. */
+/** 발화 실패 사유. */
 export type TTSFailureReason =
   /** 브라우저가 음성합성을 지원하지 않음 */
   | "unsupported"
@@ -30,7 +30,7 @@ export interface TTSProvider {
   cancel(): void;
 }
 
-/** 브라우저 SpeechSynthesis 구현 — 한국어 여성/차분한 톤 우선 */
+/** 브라우저 SpeechSynthesis 구현. */
 export class BrowserTTSProvider implements TTSProvider {
   readonly name = "browser-speech-synthesis";
   private voice: SpeechSynthesisVoice | null = null;
@@ -47,12 +47,12 @@ export class BrowserTTSProvider implements TTSProvider {
   }
 
   private loadVoice() {
-    const voices = window.speechSynthesis.getVoices().filter((v) => v.lang?.startsWith("ko"));
+    if (this.voice) return;
+    const voices = window.speechSynthesis
+      .getVoices()
+      .filter((voice) => voice.lang?.toLowerCase().startsWith("ko"));
     if (voices.length === 0) return;
-    // 여성/차분한 음성 우선 선택
-    const prefer = ["yuna", "heami", "female", "여성", "google"];
-    this.voice =
-      voices.find((v) => prefer.some((p) => v.name.toLowerCase().includes(p))) ?? voices[0];
+    this.voice = [...voices].sort(compareVoices)[0];
   }
 
   speak(text: string, opts: SpeakOptions = {}): Promise<TTSSpeakResult> {
@@ -67,8 +67,6 @@ export class BrowserTTSProvider implements TTSProvider {
       u.pitch = opts.pitch ?? 1.0;
       u.volume = opts.volume ?? 1.0;
       u.onend = () => resolve({ ok: true });
-      // autoplay 차단은 실패로 보고한다. 상위 UI는 다음 실제 사용자
-      // 상호작용의 call stack에서 이 실제 발화를 즉시 재시도한다.
       u.onerror = (event) =>
         resolve({
           ok: false,
@@ -83,6 +81,19 @@ export class BrowserTTSProvider implements TTSProvider {
   }
 }
 
+function compareVoices(a: SpeechSynthesisVoice, b: SpeechSynthesisVoice): number {
+  if (a.default !== b.default) return a.default ? -1 : 1;
+  if (a.localService !== b.localService) return a.localService ? -1 : 1;
+  const uriOrder = compareCaseFolded(a.voiceURI, b.voiceURI);
+  if (uriOrder !== 0) return uriOrder;
+  return compareCaseFolded(a.name, b.name);
+}
+
+function compareCaseFolded(a: string, b: string): number {
+  const foldedA = a.toLowerCase();
+  const foldedB = b.toLowerCase();
+  return foldedA < foldedB ? -1 : foldedA > foldedB ? 1 : 0;
+}
 
 let provider: TTSProvider | null = null;
 export function getTTSProvider(): TTSProvider {

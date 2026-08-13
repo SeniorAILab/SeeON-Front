@@ -5,9 +5,10 @@ import { LogoMark } from "@/components/Logo";
 import { ConnectionStatusBadge } from "./ConnectionStatusBadge";
 import { RealtimeUpdateIndicator } from "./RealtimeUpdateIndicator";
 import { FloorSummaryStats } from "./FloorSummaryStats";
-import { SoundToggle } from "./SoundToggle";
+import { AudioToggleButton } from "./AudioToggleButton";
 import { FullscreenButton } from "./FullscreenButton";
 import { dashboardPath, floorPath } from "@/lib/routeAccess";
+import { useMonitorSettingsStore } from "@/features/monitor/stores/monitorSettingsStore";
 import type { ConnectionState, DashboardSummary, Floor } from "@/types";
 
 function useClock() {
@@ -36,8 +37,6 @@ export function MonitorHeader({
   totalPeople,
   connection,
   lastUpdateAt,
-  soundEnabled,
-  onToggleSound,
   onRefresh,
   fullscreenRef,
   floors,
@@ -54,8 +53,6 @@ export function MonitorHeader({
   totalPeople: number;
   connection: ConnectionState;
   lastUpdateAt: string | null;
-  soundEnabled: boolean;
-  onToggleSound: () => void;
   onRefresh: () => void;
   fullscreenRef: React.RefObject<HTMLElement>;
   floors: Floor[];
@@ -69,6 +66,8 @@ export function MonitorHeader({
   disconnectedRooms?: { spaceId: string; name: string; lastSeenAt: string | null }[];
 }) {
   const navigate = useNavigate();
+  const soundEnabled = useMonitorSettingsStore((state) => state.alertSound);
+  const updateSettings = useMonitorSettingsStore((state) => state.update);
   // 상단 가로 배너는 만들지 않는다. 화면은 조용히 두고, 정보는 벨 배지로
   // 남긴다(누르지 않아도 숫자는 보인다).
   const [bellOpen, setBellOpen] = useState(false);
@@ -300,9 +299,10 @@ export function MonitorHeader({
               </div>
             )}
           </div>
-          <div className="flex min-h-12 items-center">
-            <SoundToggle enabled={soundEnabled} onToggle={onToggleSound} />
-          </div>
+          <AudioToggleButton
+            enabled={soundEnabled}
+            onToggle={() => updateSettings({ alertSound: !soundEnabled })}
+          />
           <FullscreenButton targetRef={fullscreenRef} />
         </div>
       </div>

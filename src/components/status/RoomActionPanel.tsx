@@ -34,11 +34,8 @@ export function RoomActionPanel({
     () => [...alerts].sort((a, b) => Date.parse(b.detectedAt) - Date.parse(a.detectedAt)),
     [alerts],
   );
-  const unacknowledgedCount = alerts.filter((alert) => alert.alertStatus !== "ACKNOWLEDGED").length;
   const canResolve = alerts.length > 0;
-  // 아직 아무도 확인하지 않은 알림이 있을 때만 "확인"이 의미가 있다.
-  const canAcknowledge = unacknowledgedCount > 0;
-  // 해결 완료 실패 사유. 서버가 거부하면 여기에 뜬다.
+  // 확인 처리 실패 사유. 서버가 거부하면 여기에 뜬다.
   const [resolveError, setResolveError] = useState<string | null>(null);
 
   const closePanel = useCallback(() => {
@@ -82,35 +79,6 @@ export function RoomActionPanel({
     }
   }
 
-  /**
-   * 확인(ACK). 알림을 받았다는 신호만 보낸다 — 조치 기록을 요구하지 않는다.
-   * TV 앞에서 타이핑하기 전에 "내가 간다"를 먼저 알려야 다른 요양보호사가
-   * 같은 방으로 중복 출동하지 않는다.
-   */
-  async function handleAcknowledge() {
-    await handleAcknowledgeIds(
-      alerts
-        .filter((alert) => alert.alertStatus !== "ACKNOWLEDGED")
-        .map((alert) => alert.id),
-    );
-  }
-
-  async function handleAcknowledgeIds(ids: string[]) {
-    if (ids.length === 0 || busy) return;
-    setBusy(true);
-    setResolveError(null);
-    try {
-      await Promise.all(ids.map((id) => alertService.acknowledge(id)));
-      onResolved?.();
-    } catch (caught) {
-      setResolveError(
-        apiErrorMessage(caught, "확인 처리를 하지 못했습니다. 다시 시도해 주세요."),
-      );
-    } finally {
-      setBusy(false);
-    }
-  }
-
   async function handleResolve(alertIds?: string[]) {
     const ids = alertIds ?? alerts.map((alert) => alert.id);
     if (ids.length === 0 || busy) return;
@@ -126,7 +94,7 @@ export function RoomActionPanel({
       setResolveError(
         apiErrorMessage(
           caught,
-          "해결 완료로 바꾸지 못했습니다. 다시 시도해 주세요.",
+          "확인 처리를 하지 못했습니다. 다시 시도해 주세요.",
         ),
       );
     } finally {
@@ -154,7 +122,7 @@ export function RoomActionPanel({
           <div className="break-keep text-2xl font-black leading-tight text-ink 2xl:text-3xl">{space.name}</div>
           <div className="mt-1 text-lg font-bold text-ink-soft">
             {statusWord[status?.status ?? "STABLE"]}
-            {alerts.length > 0 && <span className="ml-2 text-staff-body font-bold text-ink-soft">미확인 {unacknowledgedCount}건</span>}
+            {alerts.length > 0 && <span className="ml-2 text-staff-body font-bold text-ink-soft">{alerts.length}건</span>}
           </div>
         </div>
         <button type="button" onClick={closePanel} className="flex h-14 w-14 items-center justify-center rounded-2xl border border-border text-ink-soft hover:bg-surface2" aria-label="모달 닫기">
@@ -171,7 +139,6 @@ export function RoomActionPanel({
               {visibleFeed.map((alert) => {
                 const presentation = detectionEventPresentationFor(alert.eventType);
                 const title = alert.eventType === "OTHER" ? displayEventTypeLabel(alert) : presentation.title;
-                const isAcknowledged = alert.alertStatus === "ACKNOWLEDGED";
                 const Icon = presentation.icon;
                 const isDanger = presentation.severity === "high";
                 return (
@@ -194,8 +161,8 @@ export function RoomActionPanel({
                     </div>
                     <button
                       type="button"
-                      disabled={busy || isAcknowledged}
-                      onClick={() => void handleAcknowledgeIds([alert.id])}
+                      disabled={busy}
+                      onClick={() => void handleResolve([alert.id])}
                       className="min-h-12 shrink-0 rounded-lg border border-border px-3 py-1 text-staff-btn text-ink disabled:cursor-not-allowed disabled:text-ink-faint"
                     >
                       확인
@@ -230,24 +197,18 @@ export function RoomActionPanel({
         )}
       </div>
 
-      <p className="mt-4 text-staff-body font-bold text-ink-soft">
-        먼저 <b>확인</b>을 눌러 알림을 받았다고 알리세요. 현장을 확인한 뒤
-        <b>해결 완료</b>를 누르면 알람이 꺼집니다. 텍스트를 입력할 필요는 없습니다.
-      </p>
-      <div className="mt-3 flex flex-wrap gap-2">
-        {/* 확인(ACK)과 해결 완료(RESOLVE)는 조치 기록을 요구하지 않는다 —
-            화면에는 텍스트 입력이 없다. TV 앞에서 타이핑하기 전에 "내가
-            간다"를 먼저 알려야 다른 사람이 중복으로 달려가지 않는다. */}
+      {/* 확인 한 번이 곧 처리 완료다. isActiveAlert()는 백엔드 상태가
+          RESOLVED가 아닌 한 계속 "활성"으로 보므로(alertMerge.ts:226-228),
+          resolve() 호출만이 알림을 보드에서 내릴 수 있다. 두 단계로 나뉜
+          예전 흐름은 더 이상 없다 — 이 버튼 하나가 전부다. */}
+      <div className="mt-4 flex flex-wrap justify-end gap-2">
         <button
           type="button"
-          disabled={!canAcknowledge || busy}
-          onClick={() => void handleAcknowledge()}
-          className="h-14 rounded-2xl border border-brand px-5 text-staff-btn text-brand hover:bg-brand-soft disabled:cursor-not-allowed disabled:border-border disabled:text-ink-faint"
+          disabled={!canResolve || busy}
+          onClick={() => void handleResolve()}
+          className="h-14 rounded-2xl bg-brand px-5 text-staff-btn text-white shadow-card disabled:cursor-not-allowed disabled:bg-surface2 disabled:text-ink-faint"
         >
-          {busy ? "처리 중" : "확인"}
-        </button>
-        <button type="button" disabled={!canResolve || busy} onClick={() => void handleResolve()} className="h-14 rounded-2xl bg-brand px-5 text-staff-btn text-white shadow-card disabled:cursor-not-allowed disabled:bg-surface2 disabled:text-ink-faint">
-          {busy ? "처리 중" : "해결 완료"}
+          {busy ? "처리 중" : alerts.length > 1 ? "모두 확인" : "확인"}
         </button>
       </div>
       {resolveError && (

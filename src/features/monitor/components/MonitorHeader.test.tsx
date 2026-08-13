@@ -107,7 +107,8 @@ describe("MonitorHeader floor selector", () => {
 });
 
 describe("MonitorHeader compact focus presentation", () => {
-  it("uses the compact DOM contract while retaining identity, risk, connection, floor navigation, and controls", () => {
+  it("uses the compact DOM contract while retaining identity, risk, connection, floor navigation, and one audio control", () => {
+    useMonitorSettingsStore.setState({ alertSound: true });
     render(
       <MemoryRouter>
         <MonitorHeader
@@ -117,8 +118,6 @@ describe("MonitorHeader compact focus presentation", () => {
           totalPeople={3}
           connection="NORMAL"
           lastUpdateAt={null}
-          soundEnabled={false}
-          onToggleSound={vi.fn()}
           onRefresh={vi.fn()}
           fullscreenRef={createRef<HTMLElement>()}
           floors={floors}
@@ -136,6 +135,7 @@ describe("MonitorHeader compact focus presentation", () => {
     expect(header.querySelector('[data-monitor-header="connection"]')).not.toBeNull();
     expect(header.querySelector('[data-monitor-header="controls"]')).not.toBeNull();
     expect(within(header).getByRole("navigation", { name: "층 선택" })).not.toBeNull();
+    expect(within(header).getAllByRole("button", { name: "음성 안내 켜짐" })).toHaveLength(1);
   });
 
   it("keeps the default presentation separate from the compact focus contract", () => {

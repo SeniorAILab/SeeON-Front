@@ -197,7 +197,10 @@ export function MonitorHeader({
                 </div>
               )}
             </div>
-            <SoundToggle enabled={soundEnabled} onToggle={onToggleSound} />
+            <AudioToggleButton
+              enabled={soundEnabled}
+              onToggle={() => updateSettings({ alertSound: !soundEnabled })}
+            />
             <FullscreenButton targetRef={fullscreenRef} />
           </div>
         </div>

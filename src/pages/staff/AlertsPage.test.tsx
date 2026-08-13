@@ -27,28 +27,46 @@ beforeEach(async () => {
   vi.mocked(alertService.listRecent).mockResolvedValue([resolvedAlert]);
 });
 
-
-
-describe("확인/해결은 메모 없이 버튼 하나로 끝난다", () => {
+describe("확인은 메모 없이 버튼 한 번으로 끝난다", () => {
   async function svc() {
     const { alertService } = await import("@/services/alertService");
     return alertService;
   }
 
-  it("확인됨 카드는 텍스트 입력 없이 '현장 확인 완료' 버튼 하나만 보여준다", async () => {
+  it("확인 필요 카드는 텍스트 입력 없이 '확인' 버튼 하나만 보여준다", async () => {
     const alertService = await svc();
     vi.mocked(alertService.listRecent).mockResolvedValue([
-      { ...resolvedAlert, id: "alert-acked", status: "ACKED", type: "fall" } as AlertView,
+      { ...resolvedAlert, id: "alert-new", status: "NEW", type: "fall" } as AlertView,
     ]);
 
     render(<AlertsPage />);
 
-    expect(await screen.findByRole("button", { name: "현장 확인 완료" })).toBeTruthy();
+    expect(await screen.findByRole("button", { name: "확인" })).toBeTruthy();
     expect(screen.queryByRole("textbox")).toBeNull();
     expect(screen.queryByText(/메모/)).toBeNull();
   });
 
-  it("'현장 확인 완료'를 누르면 메모 없이 곧바로 resolve를 호출한다", async () => {
+  it("'확인'을 누르면 메모 없이 곧바로 resolve만 호출하고 acknowledge는 호출하지 않는다", async () => {
+    const alertService = await svc();
+    vi.mocked(alertService.listRecent).mockResolvedValue([
+      { ...resolvedAlert, id: "alert-new", status: "NEW", type: "fall" } as AlertView,
+    ]);
+    vi.mocked(alertService.resolve).mockResolvedValue({
+      ...resolvedAlert,
+      id: "alert-new",
+      status: "RESOLVED",
+    } as AlertView);
+    vi.mocked(alertService.acknowledge).mockClear();
+
+    render(<AlertsPage />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "확인" }));
+
+    await waitFor(() => expect(alertService.resolve).toHaveBeenCalledWith("alert-new"));
+    expect(alertService.acknowledge).not.toHaveBeenCalled();
+  });
+
+  it("레거시 ACKED 알림도 '확인 필요' 섹션에 나타나고 한 번의 확인으로 끝난다", async () => {
     const alertService = await svc();
     vi.mocked(alertService.listRecent).mockResolvedValue([
       { ...resolvedAlert, id: "alert-acked", status: "ACKED", type: "fall" } as AlertView,
@@ -58,12 +76,61 @@ describe("확인/해결은 메모 없이 버튼 하나로 끝난다", () => {
       id: "alert-acked",
       status: "RESOLVED",
     } as AlertView);
+    vi.mocked(alertService.acknowledge).mockClear();
 
     render(<AlertsPage />);
 
-    fireEvent.click(await screen.findByRole("button", { name: "현장 확인 완료" }));
+    expect(await screen.findByRole("heading", { name: "확인 필요" })).toBeTruthy();
+    const button = await screen.findByRole("button", { name: "확인" });
+
+    fireEvent.click(button);
 
     await waitFor(() => expect(alertService.resolve).toHaveBeenCalledWith("alert-acked"));
+    expect(alertService.acknowledge).not.toHaveBeenCalled();
+  });
+
+  it("ACKED 알림도 ackedAt/resolvedAt 없이 크래시 없이 렌더링되고 감지 시각을 보여준다", async () => {
+    const alertService = await svc();
+    vi.mocked(alertService.listRecent).mockResolvedValue([
+      {
+        id: "alert-acked-legacy",
+        room: "305호",
+        status: "ACKED",
+        type: "fall",
+        detectedAt: "2026-07-03T00:00:00.000Z",
+      } as AlertView,
+    ]);
+
+    render(<AlertsPage />);
+
+    expect(await screen.findByRole("button", { name: "확인" })).toBeTruthy();
+  });
+
+  it("RESOLVED 알림은 '처리됨' 섹션에 나타나고 동작 버튼이 없다", async () => {
+    const alertService = await svc();
+    vi.mocked(alertService.listRecent).mockResolvedValue([resolvedAlert]);
+
+    render(<AlertsPage />);
+
+    expect(await screen.findByRole("heading", { name: "처리됨" })).toBeTruthy();
+    expect(await screen.findByText(/요양보호사 해결/)).toBeTruthy();
+    expect(screen.queryByRole("button")).toBeNull();
+  });
+
+  it("'현장 확인 완료' 버튼은 어디에도 없다 — 두 단계 흐름으로의 회귀 방지", async () => {
+    const alertService = await svc();
+    vi.mocked(alertService.listRecent).mockResolvedValue([
+      { ...resolvedAlert, id: "alert-new", status: "NEW", type: "fall" } as AlertView,
+      { ...resolvedAlert, id: "alert-acked", status: "ACKED", type: "fall" } as AlertView,
+      resolvedAlert,
+    ]);
+
+    render(<AlertsPage />);
+
+    await screen.findAllByRole("button", { name: "확인" });
+    expect(screen.queryByRole("button", { name: "현장 확인 완료" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "확인하러 갑니다" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "확인됨" })).toBeNull();
   });
 });
 
@@ -130,20 +197,19 @@ describe("이벤트 유형 표시", () => {
 });
 
 describe("카드마다 주요 동작은 정확히 하나다", () => {
-  it("NEW 카드는 '확인하러 갑니다' 버튼만, ACKED 카드는 '현장 확인 완료' 버튼만 갖는다", async () => {
+  it("확인 필요 카드는 '확인' 버튼만, 처리됨 카드는 동작 버튼이 없다", async () => {
     const { alertService } = await import("@/services/alertService");
     vi.mocked(alertService.listRecent).mockResolvedValue([
       { ...resolvedAlert, id: "alert-new", status: "NEW", type: "fall" } as AlertView,
       { ...resolvedAlert, id: "alert-acked", status: "ACKED", type: "fall" } as AlertView,
+      resolvedAlert,
     ]);
 
     render(<AlertsPage />);
 
-    const newButtons = await screen.findAllByRole("button", { name: "확인하러 갑니다" });
-    const ackButtons = screen.getAllByRole("button", { name: "현장 확인 완료" });
-    expect(newButtons).toHaveLength(1);
-    expect(ackButtons).toHaveLength(1);
-    // NEW 카드에는 해결 버튼이, ACKED 카드에는 확인 버튼이 없어야 한다.
+    const confirmButtons = await screen.findAllByRole("button", { name: "확인" });
+    expect(confirmButtons).toHaveLength(2);
+    // 확인 필요 카드에는 확인 버튼만 있고, 메모 버튼은 어디에도 없어야 한다.
     expect(screen.queryByRole("button", { name: "메모 보기" })).toBeNull();
   });
 });
@@ -163,80 +229,57 @@ describe("대량 알림 렌더링", () => {
     render(<AlertsPage />);
 
     await screen.findByRole("heading", { name: "확인 필요" });
-    const newCount = many.filter((a) => a.status === "NEW").length;
-    expect((await screen.findAllByRole("button", { name: "확인하러 갑니다" }))).toHaveLength(newCount);
+    const outstandingCount = many.filter((a) => a.status === "NEW" || a.status === "ACKED").length;
+    expect((await screen.findAllByRole("button", { name: "확인" }))).toHaveLength(outstandingCount);
   });
 });
 
-describe("완료 조건 ⑤: 큰 버튼 두 번으로 처리", () => {
+describe("완료 조건: 큰 버튼 한 번으로 처리", () => {
   /** 매 상태마다 화면에 텍스트 입력 수단이 하나도 없어야 한다 — 메모는 선택, 필수가 아니다. */
   function expectNoTextInputAnywhere(container: HTMLElement) {
     expect(container.querySelectorAll("input, textarea, [contenteditable]")).toHaveLength(0);
   }
 
-  it("새 알림을 텍스트 입력 없이 큰 버튼 두 번만으로 해결 상태까지 처리한다", async () => {
+  it("새 알림을 텍스트 입력 없이 큰 버튼 한 번만으로 처리 완료까지 끝낸다", async () => {
     const { alertService } = await import("@/services/alertService");
 
     const base = { id: "alert-e2e", room: "310호", type: "fall", detectedAt: "2026-07-03T00:00:00.000Z" };
     const newAlert = { ...base, status: "NEW" } as AlertView;
-    const ackedAlert = {
-      ...base,
-      status: "ACKED",
-      ackedByName: "요양보호사",
-      ackedAt: "2026-07-03T00:01:00.000Z",
-    } as AlertView;
     const resolvedFromFlow = {
       ...base,
       status: "RESOLVED",
-      ackedByName: "요양보호사",
-      ackedAt: "2026-07-03T00:01:00.000Z",
       resolvedByName: "요양보호사",
       resolvedAt: "2026-07-03T00:02:00.000Z",
     } as AlertView;
 
     // acknowledge/resolve는 파일 전역에서 공유되는 mock이라 앞선 테스트의 호출 횟수가
-    // 남아있다 — 이 흐름이 "정확히 두 번"인지 보려면 이 테스트만의 호출 횟수여야 한다.
+    // 남아있다 — 이 흐름이 "정확히 한 번"인지 보려면 이 테스트만의 호출 횟수여야 한다.
     vi.mocked(alertService.acknowledge).mockClear();
     vi.mocked(alertService.resolve).mockClear();
 
-    // acknowledge/resolve 각각이 성공한 뒤 AlertsPage는 목록을 다시 불러온다(runAction → load).
-    // 세 번의 listRecent 호출이 NEW → ACKED → RESOLVED 각 단계의 화면 상태를 만든다.
+    // resolve가 성공한 뒤 AlertsPage는 목록을 다시 불러온다(runAction → load).
+    // 두 번의 listRecent 호출이 NEW → RESOLVED 각 단계의 화면 상태를 만든다.
     vi.mocked(alertService.listRecent)
       .mockResolvedValueOnce([newAlert])
-      .mockResolvedValueOnce([ackedAlert])
       .mockResolvedValueOnce([resolvedFromFlow]);
-    vi.mocked(alertService.acknowledge).mockResolvedValue(ackedAlert);
     vi.mocked(alertService.resolve).mockResolvedValue(resolvedFromFlow);
 
     const { container } = render(<AlertsPage />);
 
-    // --- 상태 1: NEW. 카드의 주요 동작은 "확인하러 갑니다" 하나뿐이다. ---
-    const firstPress = await screen.findByRole("button", { name: "확인하러 갑니다" });
-    expect(screen.queryByRole("button", { name: "현장 확인 완료" })).toBeNull();
+    // --- 상태 1: NEW. 카드의 주요 동작은 "확인" 하나뿐이다. ---
+    const press = await screen.findByRole("button", { name: "확인" });
     expect(screen.queryByRole("button", { name: "메모 보기" })).toBeNull();
-    expect(firstPress.className).toContain("min-h-[56px]");
+    expect(press.className).toContain("min-h-[56px]");
     expectNoTextInputAnywhere(container);
 
-    // --- 누름 1/2 ---
-    fireEvent.click(firstPress);
-    await waitFor(() => expect(alertService.acknowledge).toHaveBeenCalledWith("alert-e2e"));
-
-    // --- 상태 2: ACKED. 이제 주요 동작은 "현장 확인 완료" 하나뿐 — 방금 눌렀던 버튼과
-    // 경쟁하는 primary가 동시에 남아있지 않다. ---
-    const secondPress = await screen.findByRole("button", { name: "현장 확인 완료" });
-    expect(screen.queryByRole("button", { name: "확인하러 갑니다" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "메모 보기" })).toBeNull();
-    expect(secondPress.className).toContain("min-h-[56px]");
-    expectNoTextInputAnywhere(container);
-
-    // --- 누름 2/2 ---
-    fireEvent.click(secondPress);
+    // --- 누름 1/1 ---
+    fireEvent.click(press);
     await waitFor(() => expect(alertService.resolve).toHaveBeenCalledWith("alert-e2e"));
 
-    // --- 상태 3: RESOLVED. 정확히 두 번의 버튼 입력만으로 도달했다. ---
-    expect(screen.queryByRole("button", { name: "확인하러 갑니다" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "현장 확인 완료" })).toBeNull();
-    expect(alertService.acknowledge).toHaveBeenCalledTimes(1);
+    // --- 상태 2: RESOLVED. 정확히 한 번의 버튼 입력만으로 도달했다. ---
+    await screen.findByRole("heading", { name: "처리됨" });
+    expect(screen.queryByRole("button", { name: "확인" })).toBeNull();
+    expect(alertService.acknowledge).not.toHaveBeenCalled();
     expect(alertService.resolve).toHaveBeenCalledTimes(1);
     // 흐름을 완료하는 데 텍스트 입력 수단은 어디에도 필요하지 않았다.
     expectNoTextInputAnywhere(container);

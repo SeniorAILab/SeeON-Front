@@ -94,7 +94,6 @@ const SECRET_KEY_PATTERN = /(SECRET|TOKEN|PASSWORD|PEPPER|KEY|CREDENTIAL|PRIVATE
 const EXPECTED_ACTIVE_ENV_MAP: ReadonlyMap<string, string> = new Map([
   ["VITE_API_BASE_URL", "/api/v1"],
   ["VITE_DEV_BACKEND_ORIGIN", "http://localhost:8080"],
-  ["VITE_EVENT_CLIPS_ENABLED", "false"],
 ]);
 
 describe("frontend env contract", () => {
@@ -108,7 +107,7 @@ describe("frontend env contract", () => {
     expect(declaredKeys).toEqual(used);
   });
 
-  it("publishes the exact active three-key contract with exact values", () => {
+  it("publishes the exact active two-key contract with exact values", () => {
     const declared = parseActiveDotEnvExample();
     expect(declared).toEqual(EXPECTED_ACTIVE_ENV_MAP);
   });

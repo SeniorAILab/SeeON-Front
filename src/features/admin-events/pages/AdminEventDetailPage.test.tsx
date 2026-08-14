@@ -101,22 +101,11 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  vi.unstubAllEnvs();
   useAuthStore.setState({ user: null, initialized: false });
 });
 
 describe("AdminEventDetailPage alert evidence integration", () => {
-  it("keeps the evidence card and metadata request off by default", async () => {
-    vi.stubEnv("VITE_EVENT_CLIPS_ENABLED", undefined);
-    renderDetail();
-
-    expect(await screen.findByRole("heading", { name: "101호 이슈 상세" })).toBeTruthy();
-    expect(screen.queryByRole("heading", { name: "감지 근거 영상" })).toBeNull();
-    expect(alertService.getMedia).not.toHaveBeenCalled();
-  });
-
-  it("loads alert-bound evidence only when the deployment opts in", async () => {
-    vi.stubEnv("VITE_EVENT_CLIPS_ENABLED", "true");
+  it("renders alert-bound evidence by default for an ADMIN without a Vite flag", async () => {
     renderDetail();
 
     expect(await screen.findByRole("heading", { name: "감지 근거 영상" })).toBeTruthy();
@@ -128,6 +117,25 @@ describe("AdminEventDetailPage alert evidence integration", () => {
     expect(description.classList.contains("text-ink-soft")).toBe(true);
     expect(description.classList.contains("text-ink-faint")).toBe(false);
     expect(alertService.getMedia).toHaveBeenCalledWith(EVENT.id, expect.any(AbortSignal));
+  });
+
+  it("renders alert-bound evidence for a SUPER_ADMIN without a Vite flag", async () => {
+    useAuthStore.setState({ user: { ...USER, role: "SUPER_ADMIN" }, initialized: true });
+    renderDetail();
+
+    expect(await screen.findByRole("heading", { name: "감지 근거 영상" })).toBeTruthy();
+    expect(await screen.findByText("이 알림에 연결된 근거 영상이 없습니다.")).toBeTruthy();
+    expect(alertService.getMedia).toHaveBeenCalledWith(EVENT.id, expect.any(AbortSignal));
+  });
+
+  it("keeps STAFF behind the permission guard without requesting media", async () => {
+    useAuthStore.setState({ user: { ...USER, role: "STAFF" }, initialized: true });
+    renderDetail();
+
+    expect(await screen.findByRole("heading", { name: "감지 근거 영상" })).toBeTruthy();
+    expect(screen.getByText("영상은 관리자만 확인할 수 있습니다.")).toBeTruthy();
+    expect(screen.queryByText("이 알림에 연결된 근거 영상이 없습니다.")).toBeNull();
+    expect(alertService.getMedia).not.toHaveBeenCalled();
   });
 });
 

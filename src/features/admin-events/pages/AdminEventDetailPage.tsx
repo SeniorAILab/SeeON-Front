@@ -10,7 +10,6 @@ import { EventTimeline } from "@/features/admin-events/components/EventTimeline"
 import { AlertEvidencePanel } from "@/features/admin-events/components/video/AlertEvidencePanel";
 import { VideoPermissionGuard } from "@/features/admin-events/components/video/VideoPermissionGuard";
 import { VideoAccessNotice } from "@/features/admin-events/components/video/VideoAccessNotice";
-import { isEventClipsEnabled } from "@/features/admin-events/eventClipFeature";
 import { eventService } from "@/services/eventService";
 import { dashboardService } from "@/services/dashboardService";
 import { useAuthStore } from "@/stores/authStore";
@@ -78,8 +77,6 @@ export function AdminEventDetailPage() {
   const spaceName = space?.name ?? event.room ?? event.spaceId;
   const floorName = floor?.name ?? "층 정보 없음";
   const acked = event.alertStatus === "ACKNOWLEDGED";
-  const eventClipsEnabled = isEventClipsEnabled();
-
   async function handleAcknowledge() {
     if (!user || !event) return;
     setActionError(null);
@@ -146,7 +143,7 @@ export function AdminEventDetailPage() {
         </div>
       </Card>
 
-      {eventClipsEnabled && user !== null ? (
+      {user !== null ? (
         <Card className="p-5">
           <h2 className="mb-3 flex items-center gap-2 text-base font-semibold text-ink">
             <Film aria-hidden="true" className="h-[18px] w-[18px]" />

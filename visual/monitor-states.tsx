@@ -167,7 +167,6 @@ if (MODE === "route-grid") {
     defaultFloorId: "all",
     visibleSpaceIds: null,
     cardSize: "lg",
-    nightMode: false,
   });
   // The real page starts the monitor store; undefined makes it use the fixture-backed REST seam,
   // never a live SSE connection.

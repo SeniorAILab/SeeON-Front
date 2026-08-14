@@ -28,7 +28,6 @@ beforeEach(() => {
     defaultFloorId: "fl_2f",
     refreshMs: 6000,
     alertSound: false,
-    nightMode: false,
     cardSize: "lg",
     visibleSpaceIds: null,
     allowAllView: true,

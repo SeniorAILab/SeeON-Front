@@ -13,6 +13,7 @@ interface AuthState {
   initialized: boolean;
   loading: boolean;
   error: string | null;
+  restoreError: string | null;
   init: () => Promise<void>;
   login: (input: LoginInput) => Promise<User>;
   register: (input: RegisterInput) => Promise<User>;
@@ -24,33 +25,60 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "요청 처리 중 오류가 발생했습니다.";
 }
 
+let initializationPromise: Promise<void> | null = null;
+let authGeneration = 0;
+
 export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   initialized: false,
   loading: false,
   error: null,
+  restoreError: null,
 
-  init: async () => {
-    if (get().initialized) return;
-    set({ loading: true, error: null });
-    try {
-      const session = await authService.bootstrap();
-      set({ user: session?.user ?? null, initialized: true, loading: false });
-    } catch {
-      set({
-        user: null,
-        initialized: true,
-        loading: false,
-        error: "로그인 상태를 확인하지 못했습니다. 인터넷 연결을 확인한 뒤 다시 시도해 주세요.",
+  init: () => {
+    if (get().initialized) return Promise.resolve();
+    if (initializationPromise) return initializationPromise;
+
+    const generation = authGeneration;
+    set({ loading: true, restoreError: null });
+    initializationPromise = authService
+      .bootstrap()
+      .then((session) => {
+        if (generation !== authGeneration) return;
+        set({
+          user: session?.user ?? null,
+          initialized: true,
+          loading: false,
+          restoreError: null,
+        });
+      })
+      .catch(() => {
+        if (generation !== authGeneration) return;
+        set({
+          user: null,
+          initialized: true,
+          loading: false,
+          restoreError: "로그인 상태를 확인하지 못했습니다. 인터넷 연결을 확인한 뒤 다시 시도해 주세요.",
+        });
+      })
+      .finally(() => {
+        initializationPromise = null;
       });
-    }
+
+    return initializationPromise;
   },
 
   login: async (input) => {
     set({ loading: true, error: null });
     try {
       const session = await authService.login(input);
-      set({ user: session.user, loading: false });
+      authGeneration += 1;
+      set({
+        user: session.user,
+        initialized: true,
+        loading: false,
+        restoreError: null,
+      });
       return session.user;
     } catch (error) {
       set({ error: errorMessage(error), loading: false });
@@ -62,7 +90,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ loading: true, error: null });
     try {
       const session = await authService.register(input);
-      set({ user: session.user, loading: false });
+      authGeneration += 1;
+      set({
+        user: session.user,
+        initialized: true,
+        loading: false,
+        restoreError: null,
+      });
       return session.user;
     } catch (error) {
       set({ error: errorMessage(error), loading: false });
@@ -74,7 +108,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ loading: true, error: null });
     try {
       const session = await authService.createFacility(input);
-      set({ user: session.user, loading: false });
+      authGeneration += 1;
+      set({
+        user: session.user,
+        initialized: true,
+        loading: false,
+        restoreError: null,
+      });
       return session.user;
     } catch (error) {
       set({ error: errorMessage(error), loading: false });
@@ -84,13 +124,20 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   logout: async () => {
     await authService.logout();
-    set({ user: null });
+    authGeneration += 1;
+    set({ user: null, initialized: true, loading: false, restoreError: null });
   },
 }));
 
 setUnauthorizedHandler(() => {
   const hadSession = useAuthStore.getState().user !== null;
-  useAuthStore.setState({ user: null, initialized: true, loading: false });
+  authGeneration += 1;
+  useAuthStore.setState({
+    user: null,
+    initialized: true,
+    loading: false,
+    restoreError: null,
+  });
   if (!hadSession) return;
   if (window.location.pathname !== "/login") {
     window.location.assign("/login?reason=session-invalid");

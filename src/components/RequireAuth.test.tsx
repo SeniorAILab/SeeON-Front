@@ -17,6 +17,7 @@ beforeEach(() => {
     },
     loading: false,
     error: null,
+    restoreError: null,
     initialized: true,
   });
 });
@@ -47,12 +48,15 @@ describe("RequireAuth", () => {
   });
 
   it("세션 확인 장애를 로그아웃으로 오인하지 않고 다시 시도할 수 있게 한다", () => {
-    const init = vi.fn().mockResolvedValue(undefined);
+    const init = vi.fn().mockImplementation(async () => {
+      expect(useAuthStore.getState().initialized).toBe(false);
+    });
     useAuthStore.setState({
       user: null,
       initialized: true,
       loading: false,
-      error: "로그인 상태를 확인하지 못했습니다. 인터넷 연결을 확인한 뒤 다시 시도해 주세요.",
+      error: "로그인 요청 자체의 오류",
+      restoreError: "로그인 상태를 확인하지 못했습니다. 인터넷 연결을 확인한 뒤 다시 시도해 주세요.",
       init,
     });
 

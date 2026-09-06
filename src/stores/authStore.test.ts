@@ -14,8 +14,14 @@ vi.mock("@/services/authService", () => ({
 }));
 
 beforeEach(() => {
-  vi.clearAllMocks();
-  useAuthStore.setState({ user: null, loading: false, error: null, initialized: false });
+  vi.resetAllMocks();
+  useAuthStore.setState({
+    user: null,
+    loading: false,
+    error: null,
+    restoreError: null,
+    initialized: false,
+  });
 });
 
 describe("authStore.init", () => {
@@ -28,12 +34,102 @@ describe("authStore.init", () => {
       user: null,
       initialized: true,
       loading: false,
-      error: "로그인 상태를 확인하지 못했습니다. 인터넷 연결을 확인한 뒤 다시 시도해 주세요.",
+      error: null,
+      restoreError: "로그인 상태를 확인하지 못했습니다. 인터넷 연결을 확인한 뒤 다시 시도해 주세요.",
+    });
+  });
+
+  it("deduplicates concurrent callers onto one successful session restore", async () => {
+    let resolveBootstrap!: (session: { user: {
+      id: string;
+      name: string;
+      email: string;
+      role: "ADMIN";
+      facilityId: string;
+    } }) => void;
+    const bootstrap = new Promise<{ user: {
+      id: string;
+      name: string;
+      email: string;
+      role: "ADMIN";
+      facilityId: string;
+    } }>((resolve) => {
+      resolveBootstrap = resolve;
+    });
+    authServiceMock.bootstrap.mockReturnValueOnce(bootstrap);
+
+    const firstInit = useAuthStore.getState().init();
+    const concurrentInit = useAuthStore.getState().init();
+
+    expect(concurrentInit).toBe(firstInit);
+    expect(authServiceMock.bootstrap).toHaveBeenCalledOnce();
+
+    resolveBootstrap({
+      user: {
+        id: "user-1",
+        name: "관리자",
+        email: "admin@sen.ai",
+        role: "ADMIN",
+        facilityId: "facility-1",
+      },
+    });
+    await Promise.all([firstInit, concurrentInit]);
+
+    expect(useAuthStore.getState()).toMatchObject({
+      user: { id: "user-1" },
+      initialized: true,
+      loading: false,
+      error: null,
+      restoreError: null,
+    });
+  });
+
+  it("ignores a restore failure that arrives after a successful login", async () => {
+    let rejectBootstrap!: (reason: Error) => void;
+    authServiceMock.bootstrap.mockReturnValue(
+      new Promise((_resolve, reject) => {
+        rejectBootstrap = reject;
+      }),
+    );
+    authServiceMock.login.mockResolvedValue({
+      user: {
+        id: "user-1",
+        name: "관리자",
+        email: "admin@sen.ai",
+        role: "ADMIN",
+        facilityId: "facility-1",
+      },
+    });
+
+    const init = useAuthStore.getState().init();
+    await useAuthStore.getState().login({ email: "admin@sen.ai", password: "correct" });
+    rejectBootstrap(new Error("late 503"));
+    await init;
+
+    expect(useAuthStore.getState()).toMatchObject({
+      user: { id: "user-1" },
+      initialized: true,
+      loading: false,
+      error: null,
+      restoreError: null,
     });
   });
 });
 
 describe("authStore.login", () => {
+  it("keeps login errors separate from session restore outages", async () => {
+    authServiceMock.login.mockRejectedValue(new Error("invalid credentials"));
+
+    await expect(
+      useAuthStore.getState().login({ email: "admin@sen.ai", password: "wrong" }),
+    ).rejects.toThrow("invalid credentials");
+
+    expect(useAuthStore.getState()).toMatchObject({
+      error: "invalid credentials",
+      restoreError: null,
+    });
+  });
+
   it("stores the backend user returned by email login", async () => {
     authServiceMock.login.mockResolvedValue({
       user: {
@@ -61,6 +157,25 @@ describe("authStore.login", () => {
 });
 
 describe("authStore.register", () => {
+  it("keeps signup errors separate from session restore outages", async () => {
+    authServiceMock.register.mockRejectedValue(new Error("email exists"));
+
+    await expect(
+      useAuthStore.getState().register({
+        name: "홍원장",
+        email: "owner@example.test",
+        password: "Passw0rd!234",
+        phone: "010-1111-2222",
+        facilityName: "ULW 요양원",
+      }),
+    ).rejects.toThrow("email exists");
+
+    expect(useAuthStore.getState()).toMatchObject({
+      error: "email exists",
+      restoreError: null,
+    });
+  });
+
   it("stores the backend user returned by signup", async () => {
     authServiceMock.register.mockResolvedValue({
       user: {

@@ -1,3 +1,4 @@
+import { ApiError } from "./apiClient";
 import {
   createFacilityEndpoint,
   loginEndpoint,
@@ -35,7 +36,7 @@ export const authService = {
     try {
       return await restoreSessionEndpoint();
     } catch (error) {
-      if (error instanceof Error) return null;
+      if (error instanceof ApiError && error.status === 401) return null;
       throw error;
     }
   },

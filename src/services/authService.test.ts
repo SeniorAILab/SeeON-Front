@@ -113,6 +113,20 @@ describe("authService backend session", () => {
     await expect(authService.bootstrap()).resolves.toBeNull();
   });
 
+  it("surfaces a backend outage instead of treating it as a signed-out session", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn<typeof fetch>().mockResolvedValue(
+        new Response("Service Unavailable", { status: 503 })
+      )
+    );
+
+    await expect(authService.bootstrap()).rejects.toMatchObject({
+      name: "ApiError",
+      status: 503,
+    });
+  });
+
   it("creates a facility through the backend onboarding endpoint", async () => {
     const fetchMock = vi
       .fn<typeof fetch>()

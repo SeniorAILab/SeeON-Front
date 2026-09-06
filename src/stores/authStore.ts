@@ -32,8 +32,18 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   init: async () => {
     if (get().initialized) return;
-    const session = await authService.bootstrap();
-    set({ user: session?.user ?? null, initialized: true });
+    set({ loading: true, error: null });
+    try {
+      const session = await authService.bootstrap();
+      set({ user: session?.user ?? null, initialized: true, loading: false });
+    } catch {
+      set({
+        user: null,
+        initialized: true,
+        loading: false,
+        error: "로그인 상태를 확인하지 못했습니다. 인터넷 연결을 확인한 뒤 다시 시도해 주세요.",
+      });
+    }
   },
 
   login: async (input) => {

@@ -18,6 +18,21 @@ beforeEach(() => {
   useAuthStore.setState({ user: null, loading: false, error: null, initialized: false });
 });
 
+describe("authStore.init", () => {
+  it("exposes a retryable error when the backend session check is unavailable", async () => {
+    authServiceMock.bootstrap.mockRejectedValue(new Error("503"));
+
+    await expect(useAuthStore.getState().init()).resolves.toBeUndefined();
+
+    expect(useAuthStore.getState()).toMatchObject({
+      user: null,
+      initialized: true,
+      loading: false,
+      error: "로그인 상태를 확인하지 못했습니다. 인터넷 연결을 확인한 뒤 다시 시도해 주세요.",
+    });
+  });
+});
+
 describe("authStore.login", () => {
   it("stores the backend user returned by email login", async () => {
     authServiceMock.login.mockResolvedValue({

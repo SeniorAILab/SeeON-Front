@@ -8,8 +8,8 @@ import type {
 
 
 export const dashboardService = {
-  async getDashboard(_facilityId: string): Promise<DashboardResponse> {
-    return getDashboardFromBackend();
+  async getDashboard(_facilityId: string, signal?: AbortSignal): Promise<DashboardResponse> {
+    return getDashboardFromBackend(signal);
   },
 
   async getSpaceStatus(spaceId: string): Promise<SpaceStatus | undefined> {

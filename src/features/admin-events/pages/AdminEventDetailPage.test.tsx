@@ -139,6 +139,38 @@ describe("AdminEventDetailPage alert evidence integration", () => {
   });
 });
 
+describe("AdminEventDetailPage load failures", () => {
+  it("없는 이벤트는 끝없는 loading 대신 찾을 수 없다고 알린다", async () => {
+    vi.mocked(eventService.getById).mockResolvedValueOnce(undefined);
+
+    renderDetail();
+
+    expect(await screen.findByText("이벤트를 찾을 수 없습니다.")).toBeTruthy();
+    expect(screen.queryByText("불러오는 중...")).toBeNull();
+    expect(eventService.getById).toHaveBeenCalledWith("alert-1", expect.any(AbortSignal));
+  });
+
+  it("조회 장애는 끝없는 loading 대신 다시 시도 가능한 오류로 알린다", async () => {
+    vi.mocked(eventService.getById).mockRejectedValueOnce(new Error("network down"));
+
+    renderDetail();
+
+    expect((await screen.findByRole("alert")).textContent).toContain(
+      "이벤트를 불러오지 못했습니다. 다시 시도해 주세요.",
+    );
+    expect(screen.queryByText("불러오는 중...")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+
+    expect(await screen.findByRole("heading", { name: "101호 이슈 상세" })).toBeTruthy();
+    expect(eventService.getById).toHaveBeenCalledTimes(2);
+    expect(dashboardService.getDashboard).toHaveBeenCalledWith(
+      EVENT.facilityId,
+      expect.any(AbortSignal),
+    );
+  });
+});
+
 describe("확인 완료 버튼", () => {
   it("클릭하면 노트 없이 acknowledge 서비스를 호출한다", async () => {
     vi.mocked(eventService.acknowledge).mockResolvedValueOnce({
@@ -212,6 +244,34 @@ describe("확인 완료 버튼", () => {
     fireEvent.click(ackBtn);
 
     await waitFor(() => expect(eventService.acknowledge).toHaveBeenCalled());
+    await waitFor(() => expect(eventService.getById).toHaveBeenCalledTimes(2));
+    expect(screen.getByRole("button", { name: "확인 완료" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "처리 중..." })).toBeNull();
     expect(screen.queryByText(/저장하지 못했습니다/)).toBeNull();
+  });
+
+  it("화면을 떠난 뒤 완료된 확인 요청이 이전 이벤트를 다시 불러오지 않는다", async () => {
+    let finishAcknowledge: ((event: DetectionEvent) => void) | undefined;
+    vi.mocked(eventService.acknowledge).mockImplementationOnce(
+      () => new Promise((resolve) => { finishAcknowledge = resolve; }),
+    );
+
+    const view = render(
+      <MemoryRouter initialEntries={["/events/alert-1"]}>
+        <Routes>
+          <Route path="/events/:eventId" element={<AdminEventDetailPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: "확인 완료" }));
+    await waitFor(() => expect(eventService.acknowledge).toHaveBeenCalled());
+    view.unmount();
+
+    finishAcknowledge?.({ ...EVENT, alertStatus: "ACKNOWLEDGED" });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(eventService.getById).toHaveBeenCalledTimes(1);
   });
 });

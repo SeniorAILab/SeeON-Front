@@ -92,6 +92,18 @@ describe("I1 — 목록 50건 밖 사건도 열린다", () => {
     await expect(eventService.getById("alert_missing")).resolves.toBeUndefined();
   });
 
+  it("서버 장애가 나면 없는 사건으로 숨기지 않고 호출자에게 오류를 전달한다", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn<typeof fetch>().mockResolvedValue(
+        new Response("temporarily unavailable", { status: 503 }),
+      ),
+    );
+
+    const { eventService } = await import("./eventService");
+    await expect(eventService.getById("alert_999")).rejects.toMatchObject({ status: 503 });
+  });
+
   it("/notes 라우트는 절대 호출되지 않고 단건 조회는 성공한다", async () => {
     const fetchMock = vi.fn<typeof fetch>(async (input) => {
       const url = String(input);

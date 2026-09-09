@@ -27,7 +27,7 @@ function pathSegment(value: string): string {
   return encodeURIComponent(value);
 }
 
-async function resolveCurrentFacilityId(): Promise<string> {
+async function resolveCurrentFacilityId(signal?: AbortSignal): Promise<string> {
   // 선택된 시설 스코프(super_admin의 시설 선택 포함)를 우선한다.
   // apiClient의 X-Facility-Id 헤더 소스(facilityStore)와 일치시켜 실백엔드 경로를 일관되게 스코프한다.
   const selectedFacilityId = getCurrentFacilityId();
@@ -36,27 +36,27 @@ async function resolveCurrentFacilityId(): Promise<string> {
   const authFacilityId = useAuthStore.getState().user?.facilityId;
   if (authFacilityId) return authFacilityId;
 
-  const user = parseAuthUserResponse(await requestJson("/auth/me"));
+  const user = parseAuthUserResponse(await requestJson("/auth/me", { signal }));
   if (user?.facilityId) return user.facilityId;
 
   throw new Error("현재 시설 정보를 찾을 수 없습니다.");
 }
 
-export async function getCurrentFacility(): Promise<Facility> {
-  const facilityId = await resolveCurrentFacilityId();
-  return (await requestJson(`/facilities/${pathSegment(facilityId)}`)) as Facility;
+export async function getCurrentFacility(signal?: AbortSignal): Promise<Facility> {
+  const facilityId = await resolveCurrentFacilityId(signal);
+  return (await requestJson(`/facilities/${pathSegment(facilityId)}`, { signal })) as Facility;
 }
 
 export async function listFacilities(): Promise<Facility[]> {
   return expectArray<Facility>(await requestJson("/facilities"), "facilities");
 }
 
-export async function listFloors(): Promise<Floor[]> {
-  return expectArray<Floor>(await requestJson("/floors"), "floors");
+export async function listFloors(signal?: AbortSignal): Promise<Floor[]> {
+  return expectArray<Floor>(await requestJson("/floors", { signal }), "floors");
 }
 
-export async function listSpaces(): Promise<Space[]> {
-  return expectArray<Space>(await requestJson("/spaces"), "spaces");
+export async function listSpaces(signal?: AbortSignal): Promise<Space[]> {
+  return expectArray<Space>(await requestJson("/spaces", { signal }), "spaces");
 }
 
 function statusFromSpace(space: Space): SpaceStatus {
@@ -102,12 +102,12 @@ export async function listStatuses(): Promise<Record<string, SpaceStatus>> {
   return buildStatusesFromSpaces(await listSpaces());
 }
 
-export async function getDashboardFromBackend(): Promise<DashboardResponse> {
+export async function getDashboardFromBackend(signal?: AbortSignal): Promise<DashboardResponse> {
   const [facility, floors, spaces, alerts] = await Promise.all([
-    getCurrentFacility(),
-    listFloors(),
-    listSpaces(),
-    listAlerts(),
+    getCurrentFacility(signal),
+    listFloors(signal),
+    listSpaces(signal),
+    listAlerts(signal),
   ]);
   const baseline: DashboardResponse = {
     facility,

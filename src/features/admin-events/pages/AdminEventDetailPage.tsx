@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { apiErrorMessage } from "@/services/apiClient";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Film } from "lucide-react";
@@ -34,23 +34,47 @@ export function AdminEventDetailPage() {
   const { eventId } = useParams();
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
+  const loadGeneration = useRef(0);
+  const loadController = useRef<AbortController | null>(null);
 
   const [event, setEvent] = useState<DetectionEvent | null>(null);
   const [timeline, setTimeline] = useState<DetectionEvent[]>([]);
   const [space, setSpace] = useState<Space | null>(null);
   const [floor, setFloor] = useState<Floor | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [acknowledging, setAcknowledging] = useState(false);
   // 확인 완료 실패 사유. catch가 없으면 실패해도 화면이 조용해서
   // 관리자가 처리됐다고 믿는다.
   const [actionError, setActionError] = useState<string | null>(null);
 
   async function loadEvent() {
-    if (!eventId) return;
-    const ev = await eventService.getById(eventId);
-    setEvent(ev ?? null);
-    if (ev) {
-      const dashboard = await dashboardService.getDashboard(ev.facilityId);
+    loadController.current?.abort();
+    const controller = new AbortController();
+    loadController.current = controller;
+    const generation = ++loadGeneration.current;
+    setLoading(true);
+    setLoadError(null);
+    setActionError(null);
+    setAcknowledging(false);
+    try {
+      if (!eventId) {
+        if (generation === loadGeneration.current) setEvent(null);
+        return;
+      }
+      const ev = await eventService.getById(eventId, controller.signal);
+      if (!ev) {
+        if (generation !== loadGeneration.current) return;
+        setEvent(null);
+        setSpace(null);
+        setFloor(null);
+        setTimeline([]);
+        return;
+      }
+      const dashboard = await dashboardService.getDashboard(ev.facilityId, controller.signal);
+      if (generation !== loadGeneration.current) return;
       const matchedSpace = dashboard.spaces.find((s) => s.id === ev.spaceId) ?? null;
+      setEvent(ev);
       setSpace(matchedSpace);
       setFloor(dashboard.floors.find((f) => f.id === matchedSpace?.floorId) ?? null);
       setTimeline(
@@ -58,20 +82,44 @@ export function AdminEventDetailPage() {
           .filter((item) => item.spaceId === ev.spaceId)
           .sort((a, b) => +new Date(b.detectedAt) - +new Date(a.detectedAt)),
       );
-    } else {
+    } catch (caught) {
+      if (generation !== loadGeneration.current) return;
+      setEvent(null);
       setSpace(null);
       setFloor(null);
       setTimeline([]);
+      setLoadError(
+        apiErrorMessage(caught, "이벤트를 불러오지 못했습니다. 다시 시도해 주세요."),
+      );
+    } finally {
+      if (generation === loadGeneration.current) setLoading(false);
     }
   }
 
   useEffect(() => {
-    loadEvent();
+    void loadEvent();
+    return () => {
+      loadController.current?.abort();
+      loadGeneration.current += 1;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventId]);
 
-  if (!event) {
+  if (loading) {
     return <p className="py-16 text-center text-sm text-ink-soft">불러오는 중...</p>;
+  }
+
+  if (loadError) {
+    return (
+      <div className="space-y-3 py-16 text-center">
+        <p role="alert" className="text-sm font-semibold text-status-danger">{loadError}</p>
+        <Button onClick={() => void loadEvent()}>다시 시도</Button>
+      </div>
+    );
+  }
+
+  if (!event) {
+    return <p className="py-16 text-center text-sm text-ink-soft">이벤트를 찾을 수 없습니다.</p>;
   }
 
   const spaceName = space?.name ?? event.room ?? event.spaceId;
@@ -79,18 +127,22 @@ export function AdminEventDetailPage() {
   const acked = event.alertStatus === "ACKNOWLEDGED";
   async function handleAcknowledge() {
     if (!user || !event) return;
+    const generation = loadGeneration.current;
     setActionError(null);
     setAcknowledging(true);
     try {
       await eventService.acknowledge(event.id, user.name);
+      if (generation !== loadGeneration.current) return;
+      setAcknowledging(false);
       await loadEvent();
     } catch (caught) {
+      if (generation !== loadGeneration.current) return;
       // 서버가 거부해도 조용히 넘어가면 관리자는 처리됐다고 믿는다.
       setActionError(
         apiErrorMessage(caught, "조치를 저장하지 못했습니다. 다시 시도해 주세요."),
       );
     } finally {
-      setAcknowledging(false);
+      if (generation === loadGeneration.current) setAcknowledging(false);
     }
   }
 

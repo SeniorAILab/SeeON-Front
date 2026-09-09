@@ -110,8 +110,8 @@ export function mapAlertDto(dto: BackendAlertDto): FrontendAlert {
   };
 }
 
-export async function listAlerts(): Promise<FrontendAlert[]> {
-  const body = await requestJson("/alerts");
+export async function listAlerts(signal?: AbortSignal): Promise<FrontendAlert[]> {
+  const body = await requestJson("/alerts", { signal });
   if (!Array.isArray(body)) throw new Error("Invalid alerts response");
   return body.map((item) => mapAlertDto(item as BackendAlertDto));
 }
@@ -207,8 +207,8 @@ export async function acknowledgeAlert(id: string): Promise<FrontendAlert> {
  * 예전에는 상세를 목록에서 찾았는데, 목록이 기본 50건이라 그 밖의 사건은
  * 영영 열리지 않고 "불러오는 중"에 갇혔다(프로덕션 이벤트 370건).
  */
-export async function getAlertById(id: string): Promise<FrontendAlert> {
-  const body = await requestJson(`/alerts/${encodeURIComponent(id)}`);
+export async function getAlertById(id: string, signal?: AbortSignal): Promise<FrontendAlert> {
+  const body = await requestJson(`/alerts/${encodeURIComponent(id)}`, { signal });
   return mapAlertDto(body as BackendAlertDto);
 }
 

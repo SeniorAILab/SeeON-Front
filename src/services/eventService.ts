@@ -1,18 +1,20 @@
 import { acknowledgeAlert, getAlertById, listAllAlerts } from "@/services/api/alertEndpoints";
+import { ApiError } from "@/services/apiClient";
 import type { DetectionEvent } from "@/types";
 
 let alertCache: DetectionEvent[] = [];
 
 
 export const eventService = {
-  async getById(eventId: string): Promise<DetectionEvent | undefined> {
+  async getById(eventId: string, signal?: AbortSignal): Promise<DetectionEvent | undefined> {
     // 목록 캐시에서 찾지 않고 단건 라우트로 직접 간다. 목록을 거치면
     // 상세 열람이 "목록을 어디까지 받아왔는가"에 매인다. 링크로 바로
     // 들어오는 경우처럼 목록을 아직 안 받은 상태에서도 열려야 한다.
     try {
-      return await getAlertById(eventId);
-    } catch {
-      return undefined;
+      return await getAlertById(eventId, signal);
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 404) return undefined;
+      throw error;
     }
   },
 

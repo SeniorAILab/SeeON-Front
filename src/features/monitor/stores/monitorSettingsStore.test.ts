@@ -4,6 +4,7 @@ const KEY = "senai.monitor.settings";
 
 describe("monitorSettingsStore persistence", () => {
   beforeEach(() => {
+    vi.restoreAllMocks();
     vi.resetModules();
     localStorage.clear();
   });
@@ -57,6 +58,18 @@ describe("monitorSettingsStore persistence", () => {
     // update() must not leak store action functions into the persisted payload.
     expect(persisted.update).toBeUndefined();
     expect(persisted.reset).toBeUndefined();
+  });
+
+  it("applies an update when localStorage persistence is unavailable", async () => {
+    const { useMonitorSettingsStore } = await import("./monitorSettingsStore");
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new DOMException("Storage blocked", "SecurityError");
+    });
+
+    expect(() =>
+      useMonitorSettingsStore.getState().update({ alertSound: false }),
+    ).not.toThrow();
+    expect(useMonitorSettingsStore.getState().alertSound).toBe(false);
   });
 
   it("reads back a persisted update on the next module init (round trip)", async () => {

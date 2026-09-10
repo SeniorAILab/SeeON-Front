@@ -44,8 +44,12 @@ export const useMonitorSettingsStore = create<SettingsState>((set, get) => ({
       next.defaultFloorId = DEFAULTS.defaultFloorId;
     }
     const { update: _u, reset: _r, ...data } = next;
-    localStorage.setItem(KEY, JSON.stringify(data));
     set(next);
+    try {
+      localStorage.setItem(KEY, JSON.stringify(data));
+    } catch {
+      /* keep the in-memory setting when browser storage is unavailable */
+    }
   },
   reset: () => {
     localStorage.setItem(KEY, JSON.stringify(DEFAULTS));

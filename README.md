@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./assets/readme-hero.webp" alt="방과 공간을 표현한 차분한 추상 3D 아트워크." width="100%" />
+  <img src="./assets/readme-hero.webp" alt="SeeON Front 개념 아트워크: 빨간색과 청록색 상태 카드를 표시하는 금속 모니터." width="100%" />
 </p>
 
 <p align="center"><sub>SENIOR AI LAB · SEEON</sub></p>
@@ -220,3 +220,5 @@ src/
 Vercel `react-best-practices`(pin `7c180d9044c9ae2b442b567aad4e42a28dd5ed62`)는 감사 후 **커밋하지 않았습니다**. Next.js/RSC 비중이 커서 이 Vite SPA 기본 규칙으로 쓰기 위험합니다. 필요하면 upstream을 그 커밋으로 checkout해 참고만 하세요. 이유는 `MIGRATION.md`에 있습니다.
 
 기준 시설: 행복한요양원 녹양역점. 상단 아트워크는 개념 이미지이며 실제 시설이나 제품 화면을 재현하지 않는다.
+
+[Artwork provenance](./assets/ARTWORK.md) · Original procedural Blender/Cycles reconstruction.

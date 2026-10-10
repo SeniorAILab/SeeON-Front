@@ -72,6 +72,68 @@ describe("floors api", () => {
     });
   });
 
+  it("preserves extra create fields and omits explicit undefined without defaults", async () => {
+    requestJsonMock.mockResolvedValue(backendFloor);
+    const input = { name: "3F", orderIndex: undefined, extra: "kept" };
+
+    await createFloor(input);
+
+    expect(requestJsonMock).toHaveBeenCalledWith("/floors", {
+      method: "POST",
+      body: '{"name":"3F","extra":"kept"}',
+    });
+  });
+
+  it("preserves patch extras and fractional negative order without input validation", async () => {
+    requestJsonMock.mockResolvedValue(backendFloor);
+    const patch = { name: undefined, orderIndex: -1.5, extra: "kept" };
+
+    await updateFloor("fl/1", patch);
+
+    expect(requestJsonMock).toHaveBeenCalledWith("/floors/fl%2F1", {
+      method: "PATCH",
+      body: '{"orderIndex":-1.5,"extra":"kept"}',
+    });
+  });
+
+  it.each([
+    { value: "2.5", expected: 2.5 },
+    { value: -1.5, expected: -1.5 },
+    { value: null, expected: 0 },
+    { value: "", expected: 0 },
+    { value: false, expected: 0 },
+    { value: true, expected: 1 },
+  ])("retains Number coercion for response orderIndex $value", async ({ value, expected }) => {
+    requestJsonMock.mockResolvedValue([{ ...backendFloor, orderIndex: value }]);
+
+    await expect(listFloors()).resolves.toMatchObject([{ orderIndex: expected }]);
+  });
+
+  it.each([undefined, "not-a-number", "Infinity", "-Infinity"])(
+    "rejects non-finite response orderIndex %s",
+    async (orderIndex) => {
+      requestJsonMock.mockResolvedValue([{ ...backendFloor, orderIndex }]);
+
+      await expect(listFloors()).rejects.toThrow("Invalid floor orderIndex");
+    },
+  );
+
+  it("retains the outer array guard for a null list response", async () => {
+    requestJsonMock.mockResolvedValue(null);
+
+    await expect(listFloors()).rejects.toThrow("Invalid floors response");
+  });
+
+  it.each([
+    { operation: "list", response: [null], run: () => listFloors() },
+    { operation: "create", response: null, run: () => createFloor({ name: "3F" }) },
+    { operation: "update", response: null, run: () => updateFloor("fl_1", { name: "3F" }) },
+  ])("preserves malformed null row failure for $operation", async ({ response, run }) => {
+    requestJsonMock.mockResolvedValue(response);
+
+    await expect(run()).rejects.toThrow(TypeError);
+  });
+
   it("maps an EDGE-owned floor and rejects an invalid provisioningSource", () => {
     expect(mapFloorDto({ ...backendFloor, provisioningSource: "EDGE" })).toMatchObject({
       provisioningSource: "EDGE",

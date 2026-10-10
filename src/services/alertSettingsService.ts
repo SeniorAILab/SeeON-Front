@@ -2,12 +2,10 @@ import {
   getAlertSettings as getAlertSettingsEndpoint,
   updateAlertSettings as updateAlertSettingsEndpoint,
 } from "./api/alertSettings";
-import type { AlertSettings, UpdateAlertSettingsInput } from "./api/alertSettings";
+import type { AlertSettings, UpdateAlertSettingsInput } from "@/types/alertSettings";
 
-export type { AlertSettings, UpdateAlertSettingsInput } from "./api/alertSettings";
+export type { AlertSettings, UpdateAlertSettingsInput } from "@/types/alertSettings";
 
-// UI (pages/components/hooks) import this seam wrapper, not services/api/* directly
-// (P7 seam ratchet: no-restricted-imports).
 export function getAlertSettings(): Promise<AlertSettings> {
   return getAlertSettingsEndpoint();
 }

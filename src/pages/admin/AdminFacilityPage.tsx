@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
-import { Button, Card, Field, Input } from "@/components/ui/primitives";
-import { getFacility, getFacilityEdgeStatus, updateFacility } from "@/services/api/facilities";
+import { Button, Card, Field, Input } from "@/components/ui/Primitives";
+import { facilityService } from "@/services/facilityService";
 import { useActiveFacilityId } from "@/hooks/useActiveFacilityId";
 import type { EdgeConnectionState, Facility, FacilityEdgeStatus } from "@/types";
 
@@ -34,7 +34,7 @@ export function AdminFacilityPage() {
 
   useEffect(() => {
     setError(null);
-    getFacility(facilityId)
+    facilityService.getFacility(facilityId)
       .then((value) => {
         setFacility(value);
         setForm({ name: value.name, address: value.address, phone: value.phone });
@@ -49,7 +49,7 @@ export function AdminFacilityPage() {
   useEffect(() => {
     setEdgeStatus(null);
     setEdgeStatusError(null);
-    getFacilityEdgeStatus(facilityId)
+    facilityService.getFacilityEdgeStatus(facilityId)
       .then((value) => setEdgeStatus(value))
       .catch((err) => {
         setEdgeStatusError(err instanceof Error ? err.message : "Edge 상태를 불러오지 못했습니다.");
@@ -61,7 +61,7 @@ export function AdminFacilityPage() {
     setSaving(true);
     setError(null);
     try {
-      const updated = await updateFacility(facilityId, form);
+      const updated = await facilityService.updateFacility(facilityId, form);
       setFacility(updated);
       setForm({ name: updated.name, address: updated.address, phone: updated.phone });
     } catch (err) {

@@ -160,7 +160,7 @@ export class TTSManager {
     this.spokenIdentities.delete(identity);
     this.spokenIdentities.add(identity);
     while (this.spokenIdentities.size > MAX_SPOKEN_IDENTITIES) {
-      const oldest = this.spokenIdentities.values().next().value as string | undefined;
+      const oldest = this.spokenIdentities.values().next().value;
       if (!oldest) break;
       this.spokenIdentities.delete(oldest);
     }

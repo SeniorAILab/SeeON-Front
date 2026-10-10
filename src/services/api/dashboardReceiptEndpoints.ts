@@ -1,28 +1,7 @@
 import { requestJson } from "@/services/apiClient";
-
-export type DashboardReceiptKind = "delivery" | "presentation";
-
-export interface DashboardReceiptRequestDto {
-  dashboardClientId: string;
-  backendEventId: string;
-  alertId: string;
-  alertSeq: string;
-  observedAt: string;
-  surface?: string;
-}
-
-export interface DashboardReceiptResponse {
-  deliveryId?: string;
-  presentationId?: string;
-  backendEventId: string;
-  alertId: string;
-  alertSeq: string;
-  kind: DashboardReceiptKind;
-  surface: string;
-  observedAt: string;
-  recordedAt: string;
-  duplicate: boolean;
-}
+import type { DashboardReceiptKind, DashboardReceiptResponse } from "@/types/dashboardReceipt";
+import type { DashboardReceiptRequestDto } from "./dashboard/dto/dashboard-receipt-request.dto";
+import type { DashboardReceiptResponseDto } from "./dashboard/dto/dashboard-receipt-response.dto";
 
 export async function postDashboardReceipt(
   kind: DashboardReceiptKind,
@@ -39,19 +18,24 @@ function mapDashboardReceiptDto(
   value: unknown,
   kind: DashboardReceiptKind,
 ): DashboardReceiptResponse {
-  if (!value || typeof value !== "object") {
+  if (!isDashboardReceiptResponse(value, kind)) {
     throw new Error("Invalid dashboard receipt response");
   }
-  const receipt = value as Record<string, unknown>;
+  return value;
+}
+
+function isDashboardReceiptResponse(
+  value: unknown,
+  kind: DashboardReceiptKind,
+): value is DashboardReceiptResponse {
+  if (!value || typeof value !== "object") return false;
+  const receipt = value as DashboardReceiptResponseDto;
   const idKey = kind === "delivery" ? "deliveryId" : "presentationId";
-  if (
-    typeof receipt[idKey] !== "string" ||
-    typeof receipt.backendEventId !== "string" ||
-    typeof receipt.alertId !== "string" ||
-    typeof receipt.alertSeq !== "string" ||
-    receipt.kind !== kind
-  ) {
-    throw new Error("Invalid dashboard receipt response");
-  }
-  return receipt as unknown as DashboardReceiptResponse;
+  return (
+    typeof receipt[idKey] === "string" &&
+    typeof receipt.backendEventId === "string" &&
+    typeof receipt.alertId === "string" &&
+    typeof receipt.alertSeq === "string" &&
+    receipt.kind === kind
+  );
 }

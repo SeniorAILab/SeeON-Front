@@ -1,8 +1,8 @@
-import {
-  EdgeEnrollmentResponseError,
-  type RedactedEdgeCredential,
-  type RevokedEdgeCredential,
-} from "./edgeEnrollmentTypes";
+import { EdgeEnrollmentResponseError } from "@/lib/edgeCredential";
+import type {
+  RedactedEdgeCredential,
+  RevokedEdgeCredential,
+} from "@/types/edgeEnrollment";
 import {
   readBoundedString,
   readCredentialLifecycle,

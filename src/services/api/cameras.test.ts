@@ -1,7 +1,14 @@
-import { describe, expect, it } from "vitest";
-import { buildFreshnessBySpace, resolveCameraConnection, type SpaceFreshness } from "./cameras";
-import type { CameraStatus } from "./cameras";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { buildFreshnessBySpace, listCameras, resolveCameraConnection } from "./cameras";
+import type { CameraStatus, SpaceFreshness } from "@/types/camera";
 import { STALE_CUTOFF_MS } from "@/types";
+import { requestJson } from "@/services/apiClient";
+
+vi.mock("@/services/apiClient", () => ({
+  requestJson: vi.fn(),
+}));
+
+const requestJsonMock = vi.mocked(requestJson);
 
 const SCOPED_FACILITY_ID = "fac_happy_nokyang";
 const NOW = Date.parse("2026-08-03T12:00:00.000Z");
@@ -18,6 +25,84 @@ function camera(overrides: Partial<CameraStatus> & Pick<CameraStatus, "id" | "sp
 function isoAgo(ms: number): string {
   return new Date(NOW - ms).toISOString();
 }
+
+describe("listCameras wire preservation", () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it.each([null, "", "not-a-date"])(
+    "accepts empty string identifiers and unchanged lastSeenAt %s",
+    async (lastSeenAt) => {
+      const wire = { id: "", facilityId: "", spaceId: "", online: false, lastSeenAt };
+      requestJsonMock.mockResolvedValue([wire]);
+
+      await expect(listCameras()).resolves.toEqual([wire]);
+      expect(requestJsonMock).toHaveBeenCalledWith("/cameras");
+    },
+  );
+
+  it("copies exactly the five camera fields and drops extra wire metadata", async () => {
+    const expected = camera({ id: "cam_1", spaceId: "sp_1", lastSeenAt: "unparsed-value" });
+    const wire = { ...expected, extra: "not-forwarded", metadata: { revision: 1 } };
+    requestJsonMock.mockResolvedValue([wire]);
+
+    const result = await listCameras();
+
+    expect(result).toEqual([expected]);
+    expect(result[0]).not.toBe(wire);
+  });
+
+  it.each([
+    { value: null },
+    { value: {} },
+    { value: "not-an-array" },
+    { value: 42 },
+  ])("rejects malformed collection roots $value", async ({ value }) => {
+    requestJsonMock.mockResolvedValue(value);
+
+    await expect(listCameras()).rejects.toThrow("Invalid cameras response");
+  });
+
+  it.each([
+    { value: null },
+    { value: undefined },
+    { value: [] },
+    { value: "not-an-object" },
+    { value: 42 },
+  ])("rejects malformed row roots $value with the existing error", async ({ value }) => {
+    requestJsonMock.mockResolvedValue([value]);
+
+    await expect(listCameras()).rejects.toThrow("Invalid cameras response");
+  });
+
+  it("rejects missing lastSeenAt rather than defaulting it to null", async () => {
+    requestJsonMock.mockResolvedValue([{
+      id: "cam_1",
+      facilityId: SCOPED_FACILITY_ID,
+      spaceId: "sp_1",
+      online: true,
+    }]);
+
+    await expect(listCameras()).rejects.toThrow("Invalid cameras response");
+  });
+
+  it.each([
+    { id: 1 },
+    { facilityId: null },
+    { spaceId: false },
+    { online: "true" },
+    { lastSeenAt: undefined },
+    { lastSeenAt: 42 },
+  ])("retains primitive field guards for %j", async (override) => {
+    requestJsonMock.mockResolvedValue([{
+      ...camera({ id: "cam_1", spaceId: "sp_1" }),
+      ...override,
+    }]);
+
+    await expect(listCameras()).rejects.toThrow("Invalid cameras response");
+  });
+});
 
 describe("resolveCameraConnection — stale-boundary", () => {
   it("정확히 3분(180000ms) 경과는 LIVE로 남는다", () => {

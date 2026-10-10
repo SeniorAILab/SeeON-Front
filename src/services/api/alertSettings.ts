@@ -1,15 +1,7 @@
 import { requestJson } from "@/services/apiClient";
-
-export interface AlertSettings {
-  notificationEmail: string | null;
-  emailAlertsEnabled: boolean;
-  effectiveEmail: string | null;
-}
-
-export type UpdateAlertSettingsInput = Partial<{
-  notificationEmail: string | null;
-  emailAlertsEnabled: boolean;
-}>;
+import type { AlertSettings, UpdateAlertSettingsInput } from "@/types/alertSettings";
+import type { AlertSettingsResponseDto } from "./alert-settings/dto/alert-settings-response.dto";
+import type { UpdateAlertSettingsRequestDto } from "./alert-settings/dto/update-alert-settings-request.dto";
 
 function asNullableString(value: unknown, field: string): string | null {
   if (value === null) return null;
@@ -23,11 +15,7 @@ function asBoolean(value: unknown, field: string): boolean {
 }
 
 function mapAlertSettingsDto(dto: unknown): AlertSettings {
-  const value = dto as {
-    notificationEmail?: unknown;
-    emailAlertsEnabled?: unknown;
-    effectiveEmail?: unknown;
-  };
+  const value = dto as AlertSettingsResponseDto;
   return {
     notificationEmail: asNullableString(value.notificationEmail ?? null, "notificationEmail"),
     emailAlertsEnabled: asBoolean(value.emailAlertsEnabled, "emailAlertsEnabled"),
@@ -43,7 +31,7 @@ export async function getAlertSettings(): Promise<AlertSettings> {
 export async function updateAlertSettings(input: UpdateAlertSettingsInput): Promise<AlertSettings> {
   const body = await requestJson("/auth/me/alert-settings", {
     method: "PATCH",
-    body: JSON.stringify(input),
+    body: JSON.stringify(input satisfies UpdateAlertSettingsRequestDto),
   });
   return mapAlertSettingsDto(body);
 }

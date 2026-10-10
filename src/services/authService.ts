@@ -10,13 +10,13 @@ import type {
   CreateFacilityInput,
   LoginInput,
   RegisterInput,
-} from "./api/authEndpoints";
+} from "@/types/auth";
 
 export type {
   CreateFacilityInput,
   LoginInput,
   RegisterInput,
-} from "./api/authEndpoints";
+} from "@/types/auth";
 
 export const authService = {
   async login(input: LoginInput): Promise<AuthSession> {

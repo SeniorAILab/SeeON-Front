@@ -2,16 +2,16 @@ import { useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "
 import { AlertTriangle, CheckCircle2, HelpCircle, ShieldCheck, VideoOff } from "lucide-react";
 import { timeAgo } from "@/lib/format";
 import { computeGridSpec } from "./gridSpec";
-import { useFlipAnimation } from "./useFlipAnimation";
+import { useFlipAnimation } from "@/hooks/useFlipAnimation";
 import { pulseClassFor, StatusPulseRing, type PulseTone } from "./StatusPulse";
 import { recordDashboardPresentation } from "@/services/dashboardReceiptService";
 import type { DashboardReceiptSurface, DashboardReceiptSurfaceBase } from "@/services/dashboardReceiptService";
-import type { DetectionEvent, Floor, Space, SpaceStatus, SpaceStatusLevel } from "@/types";
+import type { DetectionEvent, Floor, DashboardSpace, SpaceStatus, SpaceStatusLevel } from "@/types";
 
 export interface RoomFloorGroup {
   floor: Floor | null;
   floorName: string;
-  rooms: Space[];
+  rooms: DashboardSpace[];
   alertCount: number;
 }
 
@@ -45,7 +45,7 @@ function isEmergencyLevel(level: SpaceStatusLevel): boolean {
 }
 
 function compareRoomsByRisk(statuses: Record<string, SpaceStatus>) {
-  return (a: Space, b: Space) => {
+  return (a: DashboardSpace, b: DashboardSpace) => {
     const severity = STATUS_WEIGHT[worstStatus(statuses[b.id])] - STATUS_WEIGHT[worstStatus(statuses[a.id])];
     if (severity !== 0) return severity;
     return a.name.localeCompare(b.name, "ko", { numeric: true, sensitivity: "base" });
@@ -56,17 +56,17 @@ function floorNameFor(floorId: string): string {
   return floorId ? floorId : "미지정";
 }
 
-export function groupRoomsByFloor(spaces: Space[], statuses: Record<string, SpaceStatus>, floors: Floor[] = []): RoomFloorGroup[] {
+export function groupRoomsByFloor(spaces: DashboardSpace[], statuses: Record<string, SpaceStatus>, floors: Floor[] = []): RoomFloorGroup[] {
   const floorById = new Map(floors.map((floor) => [floor.id, floor]));
-  const knownGroups = new Map<string, Space[]>();
-  const unknownGroups = new Map<string, Space[]>();
+  const knownGroups = new Map<string, DashboardSpace[]>();
+  const unknownGroups = new Map<string, DashboardSpace[]>();
 
   for (const space of spaces) {
     const target = floorById.has(space.floorId) ? knownGroups : unknownGroups;
     target.set(space.floorId, [...(target.get(space.floorId) ?? []), space]);
   }
 
-  const toGroup = (floorId: string, rooms: Space[], floor: Floor | null): RoomFloorGroup => {
+  const toGroup = (floorId: string, rooms: DashboardSpace[], floor: Floor | null): RoomFloorGroup => {
     const orderedRooms = [...rooms].sort(compareRoomsByRisk(statuses));
     return {
       floor,
@@ -107,11 +107,11 @@ export function RoomStatusTreemap({
   presentationAlertsBySpace = {},
   receiptSurface = "monitor-room-board",
 }: {
-  spaces: Space[];
+  spaces: DashboardSpace[];
   statuses: Record<string, SpaceStatus>;
   floors?: Floor[];
   selectedSpaceId?: string | null;
-  onSelect?: (space: Space) => void;
+  onSelect?: (space: DashboardSpace) => void;
   layout?: RoomStatusLayout;
   cardSize?: "lg" | "xl";
   presentationAlertsBySpace?: Record<string, DetectionEvent>;
@@ -168,10 +168,10 @@ function FocusRoomGrid({
   presentationAlertsBySpace,
   receiptSurface,
 }: {
-  rooms: Space[];
+  rooms: DashboardSpace[];
   statuses: Record<string, SpaceStatus>;
   selectedSpaceId?: string | null;
-  onSelect?: (space: Space) => void;
+  onSelect?: (space: DashboardSpace) => void;
   cardSize: "lg" | "xl";
   presentationAlertsBySpace: Record<string, DetectionEvent>;
   receiptSurface: DashboardReceiptSurfaceBase;
@@ -250,10 +250,10 @@ function RoomTile({
   presentationAlert,
   receiptSurface,
 }: {
-  space: Space;
+  space: DashboardSpace;
   status?: SpaceStatus;
   selected: boolean;
-  onSelect?: (space: Space) => void;
+  onSelect?: (space: DashboardSpace) => void;
   layout: RoomStatusLayout;
   style?: CSSProperties;
   flipKey?: string;

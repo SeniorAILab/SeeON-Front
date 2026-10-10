@@ -9,12 +9,17 @@ import { useAuthStore } from "@/stores/authStore";
 import type { DashboardResponse, DetectionEvent, User } from "@/types";
 import { AdminEventDetailPage } from "./AdminEventDetailPage";
 
-vi.mock("@/services/alertService", () => ({
-  alertService: {
-    getMedia: vi.fn(),
-    recordMediaAccess: vi.fn(),
-  },
-}));
+vi.mock("@/services/alertService", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/services/alertService")>();
+  return {
+    ...actual,
+    alertService: {
+      ...actual.alertService,
+      getMedia: vi.fn(),
+      recordMediaAccess: vi.fn(),
+    },
+  };
+});
 
 vi.mock("@/services/dashboardService", () => ({
   dashboardService: { getDashboard: vi.fn() },

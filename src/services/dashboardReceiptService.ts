@@ -1,9 +1,6 @@
-import {
-  postDashboardReceipt,
-  type DashboardReceiptKind,
-  type DashboardReceiptResponse,
-} from "@/services/api/dashboardReceiptEndpoints";
+import { postDashboardReceipt } from "@/services/api/dashboardReceiptEndpoints";
 import type { DetectionEvent } from "@/types";
+import type { DashboardReceiptKind, DashboardReceiptResponse } from "@/types/dashboardReceipt";
 
 const CLIENT_ID_STORAGE_KEY = "eldercare.dashboard-client-id.v1";
 

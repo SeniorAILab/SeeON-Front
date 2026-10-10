@@ -1,30 +1,11 @@
 import { requestJson } from "@/services/apiClient";
-import type { ProvisioningSource, Space, SpaceType } from "@/types";
+import type { CreateSpaceInput, ProvisioningSource, Space, SpaceType, UpdateSpaceInput } from "@/types";
+import type { BackendSpaceDto } from "./spaces/dto/space-response.dto";
+import type { CreateSpaceRequestDto } from "./spaces/dto/create-space-request.dto";
+import type { UpdateSpaceRequestDto } from "./spaces/dto/update-space-request.dto";
 // 백엔드가 아직 type/capacity를 필수로 요구해 전이적으로 전송; UI 비노출;
 // 이슈: space create type/capacity 선택화·정원 폐기.
 
-export interface BackendSpaceDto {
-  id: string;
-  facilityId: string;
-  floorId: string;
-  name: string;
-  type: SpaceType;
-  capacity: number;
-  isActive: boolean;
-  assignedStaff?: string | null;
-  provisioningSource: ProvisioningSource;
-}
-
-export type CreateSpaceInput = {
-  floorId: string;
-  name: string;
-  type?: SpaceType;
-  capacity?: number;
-  isActive?: boolean;
-  assignedStaff?: string | null;
-};
-
-export type UpdateSpaceInput = Partial<CreateSpaceInput>;
 const TRANSITIONAL_CREATE_SPACE_DEFAULTS = {
   type: "ROOM" as const,
   capacity: 1,
@@ -98,7 +79,7 @@ export async function createSpace(input: CreateSpaceInput): Promise<Space> {
     body: JSON.stringify({
       ...TRANSITIONAL_CREATE_SPACE_DEFAULTS,
       ...input,
-    }),
+    } satisfies CreateSpaceRequestDto),
   });
   return mapSpaceDto(body as BackendSpaceDto);
 }
@@ -106,7 +87,7 @@ export async function createSpace(input: CreateSpaceInput): Promise<Space> {
 export async function updateSpace(id: string, patch: UpdateSpaceInput): Promise<Space> {
   const body = await requestJson(`/spaces/${encodeURIComponent(id)}`, {
     method: "PATCH",
-    body: JSON.stringify(patch),
+    body: JSON.stringify(patch satisfies UpdateSpaceRequestDto),
   });
   return mapSpaceDto(body as BackendSpaceDto);
 }

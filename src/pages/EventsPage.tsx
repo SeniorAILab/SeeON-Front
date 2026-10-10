@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { CheckCircle2, ChevronRight } from "lucide-react";
-import { Card, Button } from "@/components/ui/primitives";
+import { Card, Button } from "@/components/ui/Primitives";
 import { RiskBadge } from "@/components/RiskBadge";
 import { AlertStatusBadge } from "@/components/AlertStatusBadge";
 import { eventService } from "@/services/eventService";

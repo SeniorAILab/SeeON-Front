@@ -1,34 +1,8 @@
 import { requestJson } from "@/services/apiClient";
-import type { AlertLifecycleStatus, AlertStatus, AlertView, DetectionEvent, DetectionEventType, Level } from "@/types";
+import type { AlertLifecycleStatus, AlertStatus, AlertView, DetectionEventType, FrontendAlert, Level } from "@/types";
+import type { AlertDto, BackendAlertDto } from "./alerts/dto/alert-response.dto";
 
 const RETIRED_ALERT_TYPE = "SYSTEM_TEST";
-
-export interface BackendAlertDto {
-  alertSeq: string | number;
-  id: string;
-  backendEventId?: string | null;
-  facilityId: string;
-  residentId: string | null;
-  cameraId: string | null;
-  spaceId: string | null;
-  room?: string | null;
-  space?: { name?: string | null } | null;
-  type: string;
-  probability: number;
-  snapshotKey?: string | null;
-  detectedAt: string;
-  status: string;
-  resident?: unknown | null;
-}
-
-export type FrontendAlert = DetectionEvent & {
-  alertSeq: string;
-  residentId: string | null;
-  cameraId: string | null;
-  room?: string;
-  backendStatus: string;
-  backendType: string;
-};
 
 function asString(value: unknown, field: string): string {
   if (typeof value !== "string" || value.length === 0) throw new Error(`Invalid alert ${field}`);
@@ -210,43 +184,6 @@ export async function acknowledgeAlert(id: string): Promise<FrontendAlert> {
 export async function getAlertById(id: string): Promise<FrontendAlert> {
   const body = await requestJson(`/alerts/${encodeURIComponent(id)}`);
   return mapAlertDto(body as BackendAlertDto);
-}
-
-interface AlertActorDto {
-  nickname: string;
-}
-
-interface AlertResidentDto {
-  name: string;
-}
-
-interface AlertSpaceDto {
-  name: string;
-}
-
-export interface AlertDto {
-  alertSeq?: string;
-  id: string;
-  backendEventId?: string | null;
-  facilityId: string;
-  residentId?: string | null;
-  cameraId?: string | null;
-  spaceId: string;
-  room?: string;
-  type?: string;
-  probability: number;
-  snapshotKey?: string | null;
-  detectedAt: string;
-  status?: AlertStatus;
-  ackedById?: string | null;
-  ackedAt?: string | null;
-  ackedBy?: AlertActorDto | null;
-  resolvedById?: string | null;
-  resolvedAt?: string | null;
-  resolvedBy?: AlertActorDto | null;
-  resident?: AlertResidentDto | null;
-  space?: AlertSpaceDto;
-  createdAt?: string;
 }
 
 export function isAlertDto(value: unknown): value is AlertDto {

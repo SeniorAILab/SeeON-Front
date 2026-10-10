@@ -1,54 +1,15 @@
 import { buildApiUrl, requestJson } from "@/services/apiClient";
-
-export type ReadyAlertMediaClip = {
-  readonly contentType: "video/mp4";
-  readonly detectedAt: string;
-  readonly clipStartAt: string;
-  readonly clipEndAt: string;
-  readonly durationSeconds: number;
-};
-
-export type AlertMediaMetadata =
-  | {
-      readonly status: "PENDING";
-      readonly alertId: string;
-      readonly retryAfterSeconds: number | null;
-    }
-  | {
-      readonly status: "READY";
-      readonly alertId: string;
-      readonly clip: ReadyAlertMediaClip;
-    }
-  | { readonly status: "UNAVAILABLE"; readonly alertId: string }
-  | {
-      readonly status: "EXPIRED";
-      readonly alertId: string;
-      readonly expiredAt: string;
-    }
-  | {
-      readonly status: "DELETED";
-      readonly alertId: string;
-      readonly deletedAt: string;
-    };
-
-export type AlertMediaAccessAction =
-  | "PLAY_STARTED"
-  | "FULLSCREEN_ENTERED";
-
-export type AlertMediaAccessRequest = {
-  readonly alertId: string;
-  readonly action: AlertMediaAccessAction;
-  readonly interactionId: string;
-  readonly signal?: AbortSignal;
-};
-
-export class AlertMediaResponseError extends Error {
-  readonly name = "AlertMediaResponseError";
-
-  constructor(readonly reason: string) {
-    super(`Malformed alert media response: ${reason}`);
-  }
-}
+import { AlertMediaResponseError } from "@/lib/alertMediaErrors";
+import type {
+  AlertMediaResponseDto,
+  ReadyAlertMediaClipDto,
+} from "./alert-media/dto/alert-media-response.dto";
+import type { RecordAlertMediaAccessRequestDto } from "./alert-media/dto/record-alert-media-access-request.dto";
+import type {
+  AlertMediaAccessRequest,
+  AlertMediaMetadata,
+  ReadyAlertMediaClip,
+} from "@/types/alertMedia";
 
 export async function getAlertMediaEndpoint(
   alertId: string,
@@ -73,7 +34,7 @@ export async function recordAlertMediaAccessEndpoint(
     body: JSON.stringify({
       action: request.action,
       interactionId: request.interactionId,
-    }),
+    } satisfies RecordAlertMediaAccessRequestDto),
   };
   if (request.signal !== undefined) options.signal = request.signal;
   await requestJson(
@@ -100,27 +61,27 @@ export function parseAlertMedia(
         status,
         alertId,
         retryAfterSeconds: readRetryAfterSeconds(record.retryAfterSeconds),
-      };
+      } satisfies AlertMediaResponseDto;
     case "READY":
       requireExactKeys(record, ["status", "alertId", "clip"]);
-      return { status, alertId, clip: readReadyClip(record.clip) };
+      return { status, alertId, clip: readReadyClip(record.clip) } satisfies AlertMediaResponseDto;
     case "UNAVAILABLE":
       requireExactKeys(record, ["status", "alertId"]);
-      return { status, alertId };
+      return { status, alertId } satisfies AlertMediaResponseDto;
     case "EXPIRED":
       requireExactKeys(record, ["status", "alertId", "expiredAt"]);
       return {
         status,
         alertId,
         expiredAt: readInstant(record, "expiredAt"),
-      };
+      } satisfies AlertMediaResponseDto;
     case "DELETED":
       requireExactKeys(record, ["status", "alertId", "deletedAt"]);
       return {
         status,
         alertId,
         deletedAt: readInstant(record, "deletedAt"),
-      };
+      } satisfies AlertMediaResponseDto;
     default:
       throw new AlertMediaResponseError(`unknown status ${status}`);
   }
@@ -162,7 +123,7 @@ function readReadyClip(value: unknown): ReadyAlertMediaClip {
     clipStartAt,
     clipEndAt,
     durationSeconds,
-  };
+  } satisfies ReadyAlertMediaClipDto;
 }
 
 function readRecord(value: unknown, field: string): Record<string, unknown> {

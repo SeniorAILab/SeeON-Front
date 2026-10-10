@@ -27,10 +27,11 @@ import { AdminSpacesPage } from "@/pages/admin/AdminSpacesPage";
 import { UsersPage } from "@/pages/admin/UsersPage";
 import { AdminMonitorSettingsPage } from "@/pages/admin/AdminMonitorSettingsPage";
 import { AdminAlertSettingsPage } from "@/pages/admin/AdminAlertSettingsPage";
-import { AdminEdgeEnrollmentPage } from "@/pages/admin/AdminEdgeEnrollmentPage";
+import { AdminEdgeEnrollmentPage } from "@/features/edge-enrollment";
 import { FloorMonitorPage, FloorSelectLandingPage } from "@/features/monitor";
+import type { Role } from "@/types";
 
-const auth = (children: ReactNode, minRole?: "STAFF" | "ADMIN" | "SUPER_ADMIN") => (
+const auth = (children: ReactNode, minRole?: Role) => (
   <RouterBootstrap>
     <RequireAuth minRole={minRole}>{children}</RequireAuth>
   </RouterBootstrap>

@@ -2,16 +2,21 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { alertService } from "@/services/alertService";
-import type { AlertMediaMetadata } from "@/services/api/alertMedia";
+import type { AlertMediaMetadata } from "@/types/alertMedia";
 import { useAuthStore } from "@/stores/authStore";
 import { AlertEvidencePanel } from "./AlertEvidencePanel";
 
-vi.mock("@/services/alertService", () => ({
-  alertService: {
-    getMedia: vi.fn(),
-    recordMediaAccess: vi.fn(),
-  },
-}));
+vi.mock("@/services/alertService", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/services/alertService")>();
+  return {
+    ...actual,
+    alertService: {
+      ...actual.alertService,
+      getMedia: vi.fn(),
+      recordMediaAccess: vi.fn(),
+    },
+  };
+});
 
 class TestSetupError extends Error {
   readonly name = "TestSetupError";

@@ -1,7 +1,7 @@
 import { ShieldCheck } from "lucide-react";
 
 import { formatDateTime } from "@/lib/format";
-import { buildAlertMediaContentPath, type ReadyAlertMediaClip } from "@/services/api/alertMedia";
+import { alertService, type ReadyAlertMediaClip } from "@/services/alertService";
 
 type AlertEvidencePlayerProps = {
   readonly alertId: string;
@@ -34,7 +34,7 @@ export function AlertEvidencePlayer({
           height={720}
           playsInline
           preload="metadata"
-          src={buildAlertMediaContentPath(alertId)}
+          src={alertService.buildMediaContentPath(alertId)}
           width={1280}
           onError={onPlaybackError}
           onPlay={onPlay}

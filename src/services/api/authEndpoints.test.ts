@@ -15,10 +15,104 @@ function okJsonResponse(body: unknown): Response {
   });
 }
 
+type ForwardedExtras = {
+  extra: string;
+  omitted: undefined;
+  toJSON?: () => never;
+};
+
+const forwardingCases = [
+  {
+    operation: "login",
+    path: "/api/v1/auth/login",
+    body: '{"email":" owner@example.test ","password":" secret ","extra":"kept"}',
+    invalidResponseMessage: "로그인 응답이 올바르지 않습니다.",
+    run: (extras: ForwardedExtras) => loginEndpoint({
+      email: " owner@example.test ",
+      password: " secret ",
+      ...extras,
+    }),
+  },
+  {
+    operation: "register",
+    path: "/api/v1/auth/register",
+    body: '{"name":" Owner ","email":" owner@example.test ","password":" secret ","phone":" 010 ","facilityName":" Home ","extra":"kept"}',
+    invalidResponseMessage: "회원가입 응답이 올바르지 않습니다.",
+    run: (extras: ForwardedExtras) => registerEndpoint({
+      name: " Owner ",
+      email: " owner@example.test ",
+      password: " secret ",
+      phone: " 010 ",
+      facilityName: " Home ",
+      ...extras,
+    }),
+  },
+  {
+    operation: "create facility",
+    path: "/api/v1/facilities",
+    body: '{"facilityName":" Home ","extra":"kept"}',
+    invalidResponseMessage: "시설 생성 응답이 올바르지 않습니다.",
+    run: (extras: ForwardedExtras) => createFacilityEndpoint({
+      facilityName: " Home ",
+      ...extras,
+    }),
+  },
+];
+
 describe("auth endpoint mappers", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
   });
+
+  it.each(forwardingCases)(
+    "$operation preserves whitespace, extras, undefined omission and cookie credentials",
+    async ({ path, body, run }) => {
+      const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+        okJsonResponse({ user: { id: "user-1", role: "ADMIN" } }),
+      );
+      vi.stubGlobal("fetch", fetchMock);
+
+      const session = await run({ extra: "kept", omitted: undefined });
+
+      expect(fetchMock).toHaveBeenCalledWith(path, expect.objectContaining({
+        method: "POST",
+        credentials: "include",
+        body,
+      }));
+      expect(session.user.role).toBe("ADMIN");
+    },
+  );
+
+  it.each(forwardingCases)(
+    "$operation preserves native JSON serialization failure identity before transport",
+    async ({ run }) => {
+      const failure = new Error("serialization failure");
+      const fetchMock = vi.fn<typeof fetch>();
+      vi.stubGlobal("fetch", fetchMock);
+
+      await expect(run({
+        extra: "kept",
+        omitted: undefined,
+        toJSON: () => {
+          throw failure;
+        },
+      })).rejects.toBe(failure);
+      expect(fetchMock).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(forwardingCases)(
+    "$operation retains its invalid-session rejection rather than returning null",
+    async ({ run, invalidResponseMessage }) => {
+      vi.stubGlobal("fetch", vi.fn<typeof fetch>().mockResolvedValue(
+        okJsonResponse({ user: null }),
+      ));
+
+      await expect(run({ extra: "kept", omitted: undefined })).rejects.toThrow(
+        invalidResponseMessage,
+      );
+    },
+  );
 
   it("maps a backend session response into a frontend auth session", () => {
     const session = parseAuthSessionResponse({

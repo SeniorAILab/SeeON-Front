@@ -1,20 +1,8 @@
 import { requestJson, requestNoContent } from "@/services/apiClient";
-import type { Floor, ProvisioningSource } from "@/types";
-
-export interface BackendFloorDto {
-  id: string;
-  facilityId: string;
-  name: string;
-  orderIndex: number;
-  provisioningSource: ProvisioningSource;
-}
-
-export type CreateFloorInput = {
-  name: string;
-  orderIndex?: number;
-};
-
-export type UpdateFloorInput = Partial<CreateFloorInput>;
+import type { CreateFloorInput, Floor, ProvisioningSource, UpdateFloorInput } from "@/types";
+import type { BackendFloorDto } from "./floors/dto/floor-response.dto";
+import type { CreateFloorRequestDto } from "./floors/dto/create-floor-request.dto";
+import type { UpdateFloorRequestDto } from "./floors/dto/update-floor-request.dto";
 
 function asString(value: unknown, field: string): string {
   if (typeof value !== "string" || value.length === 0) throw new Error(`Invalid floor ${field}`);
@@ -51,7 +39,7 @@ export async function listFloors(): Promise<Floor[]> {
 export async function createFloor(input: CreateFloorInput): Promise<Floor> {
   const body = await requestJson("/floors", {
     method: "POST",
-    body: JSON.stringify(input),
+    body: JSON.stringify(input satisfies CreateFloorRequestDto),
   });
   return mapFloorDto(body as BackendFloorDto);
 }
@@ -59,7 +47,7 @@ export async function createFloor(input: CreateFloorInput): Promise<Floor> {
 export async function updateFloor(id: string, patch: UpdateFloorInput): Promise<Floor> {
   const body = await requestJson(`/floors/${encodeURIComponent(id)}`, {
     method: "PATCH",
-    body: JSON.stringify(patch),
+    body: JSON.stringify(patch satisfies UpdateFloorRequestDto),
   });
   return mapFloorDto(body as BackendFloorDto);
 }

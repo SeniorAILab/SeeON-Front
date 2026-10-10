@@ -1,34 +1,13 @@
 import type { AuthSession, Role, User } from "@/types";
+import type { CreateFacilityInput, LoginInput, RegisterInput } from "@/types/auth";
 import { requestJson, requestNoContent } from "../apiClient";
-
-interface AuthUserResponseDto {
-  id: string;
-  email?: string | null;
-  nickname?: string | null;
-  role?: string | null;
-  facilityId?: string | null;
-}
-
-interface AuthSessionResponseDto {
-  user?: AuthUserResponseDto | null;
-}
-
-export interface CreateFacilityInput {
-  readonly facilityName: string;
-}
-
-export interface LoginInput {
-  readonly email: string;
-  readonly password: string;
-}
-
-export interface RegisterInput {
-  readonly name: string;
-  readonly email: string;
-  readonly password: string;
-  readonly phone: string;
-  readonly facilityName: string;
-}
+import type { LoginRequestDto } from "./auth/dto/login-request.dto";
+import type { RegisterRequestDto } from "./auth/dto/register-request.dto";
+import type { CreateFacilityRequestDto } from "./auth/dto/create-facility-request.dto";
+import type {
+  AuthSessionResponseDto,
+  AuthUserResponseDto,
+} from "./auth/dto/auth-session-response.dto";
 
 export function parseRole(role: string | null | undefined): Role | null {
   switch (role) {
@@ -54,7 +33,7 @@ export async function loginEndpoint(input: LoginInput): Promise<AuthSession> {
   const body = await requestJson("/auth/login", {
     method: "POST",
     credentials: "include",
-    body: JSON.stringify(input),
+    body: JSON.stringify(input satisfies LoginRequestDto),
   });
   const session = parseAuthSessionResponse(body);
   if (!session) throw new Error("로그인 응답이 올바르지 않습니다.");
@@ -67,7 +46,7 @@ export async function registerEndpoint(
   const body = await requestJson("/auth/register", {
     method: "POST",
     credentials: "include",
-    body: JSON.stringify(input),
+    body: JSON.stringify(input satisfies RegisterRequestDto),
   });
   const session = parseAuthSessionResponse(body);
   if (!session) throw new Error("회원가입 응답이 올바르지 않습니다.");
@@ -88,7 +67,7 @@ export async function createFacilityEndpoint(
   const body = await requestJson("/facilities", {
     method: "POST",
     credentials: "include",
-    body: JSON.stringify(input),
+    body: JSON.stringify(input satisfies CreateFacilityRequestDto),
   });
   const session = parseAuthSessionResponse(body);
   if (!session) throw new Error("시설 생성 응답이 올바르지 않습니다.");

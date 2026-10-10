@@ -9,7 +9,7 @@ import {
   revokeEdgeCredential,
   rotateEdgeCredential,
 } from "@/services/api/edgeEnrollments";
-import { OneTimeCredential } from "@/services/api/edgeEnrollmentTypes";
+import { OneTimeCredential } from "@/lib/edgeCredential";
 import { useAuthStore } from "@/stores/authStore";
 import { AdminEdgeEnrollmentPage } from "./AdminEdgeEnrollmentPage";
 

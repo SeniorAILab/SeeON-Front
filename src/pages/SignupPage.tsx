@@ -4,7 +4,7 @@ import { ArrowLeft, Eye, EyeOff, ShieldCheck } from "lucide-react";
 import { LogoMark } from "@/components/Logo";
 import { PrivacyNotice } from "@/components/PrivacyNotice";
 import { SignupConsentFields } from "@/components/SignupConsentFields";
-import { Button, Card, Field, Input } from "@/components/ui/primitives";
+import { Button, Card, Field, Input } from "@/components/ui/Primitives";
 import { defaultPathForUser } from "@/lib/routeAccess";
 import {
   getSignupPasswordConfirmError,

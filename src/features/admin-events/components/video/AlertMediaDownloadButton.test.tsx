@@ -1,8 +1,8 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { AlertMediaDownloadError } from "@/lib/alertMediaErrors";
 
 import {
-  AlertMediaDownloadError,
   downloadAlertMediaAttachment,
 } from "@/services/api/alertMediaDownloads";
 import { useAuthStore } from "@/stores/authStore";

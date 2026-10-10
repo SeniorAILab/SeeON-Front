@@ -1,10 +1,12 @@
 import {
   EdgeEnrollmentResponseError,
   OneTimeCredential,
-  type IssuedEdgeCredential,
-  type RotatedEdgeCredential,
-} from "./edgeEnrollmentTypes";
-import type { ReplacedEdgeInstallation } from "./edgeInstallationAdminTypes";
+} from "@/lib/edgeCredential";
+import type {
+  IssuedEdgeCredential,
+  RotatedEdgeCredential,
+} from "@/types/edgeEnrollment";
+import type { ReplacedEdgeInstallation } from "@/types/edgeInstallationAdmin";
 import { parseIssueReplay } from "./edgeEnrollmentReplayParsers";
 import {
   readBoundedString,

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent a
 import { X } from "lucide-react";
 import { alertService } from "@/services/alertService";
 import { apiErrorMessage } from "@/services/apiClient";
-import type { DetectionEvent, Space, SpaceStatus } from "@/types";
+import type { DetectionEvent, DashboardSpace, SpaceStatus } from "@/types";
 import { detectionEventPresentationFor, displayEventTypeLabel } from "@/lib/labels";
 import { formatDateTime } from "@/lib/format";
 
@@ -17,7 +17,7 @@ export function RoomActionPanel({
   onClose,
   onResolved,
 }: {
-  space: Space;
+  space: DashboardSpace;
   status?: SpaceStatus;
   alerts?: DetectionEvent[];
   onClose: () => void;

@@ -1,7 +1,7 @@
 # Front src agent rules - Vite React application code
 
 ## Overview
-`front/src/**` owns the product dashboard UI, frontend domain types, services, and
+`src/**` owns the product dashboard UI, frontend domain types, services, and
 tests for the Vite React app.
 
 ## Where to look
@@ -9,11 +9,11 @@ tests for the Vite React app.
 | Task | Location | Notes |
 | --- | --- | --- |
 | App entry | `main.tsx`, `router.tsx` | React bootstrap and route tree. |
-| Feature modules | `features/<name>/` | Bulletproof-react style feature folders (`monitor`, `admin-events`, `dashboard`); each has its own `components/`, `hooks/`, `pages/`, `services/`, `stores/` as needed, plus an `index.ts` public API. `monitor/` and `admin-events/` carry their own `AGENTS.md`. |
+| Feature modules | `features/<name>/` | Bulletproof-react style feature folders (`monitor`, `admin-events`, `dashboard`, `edge-enrollment`); each has its own `components/`, `hooks/`, `pages/`, `services/`, `stores/` as needed, plus an `index.ts` public API. `monitor/` and `admin-events/` carry their own `AGENTS.md`. |
 | Route tree | `router.tsx` | Canonical routes are facility-scoped (`/facilities/:facilityId/...`); `/dashboard/*` and `/admin/*` are redirect-only legacy paths. Do not add new routes outside the facility scope. |
 | Backend access | `services/api/` | Endpoint mappers and backend DTO validation. |
 | Workflows | `services/` | Service-level orchestration over endpoint functions. |
-| Domain types | `types/index.ts` | Frontend type mirror of the PRD/API contract. |
+| Domain types | `types/index.ts`, `types/<domain>.ts` | Core frontend contract and normalized domain/view models. Raw wire DTOs belong in `services/api/<domain>/dto/`. |
 | Pages | `pages/` | Route-level UI surfaces not owned by a feature; `pages/admin/**` and `pages/staff/**` split by audience. |
 | Reusable UI | `components/` | Shared/cross-feature dashboard widgets, layout, status board, UI primitives. Feature-specific UI lives under `features/<name>/components/`. |
 | State containers | `stores/` | Zustand state containers for shared/cross-feature state (e.g. `monitorStore`, `authStore`, `facilityStore`, `uiStore`). Feature-scoped state lives under `features/<name>/stores/`. |

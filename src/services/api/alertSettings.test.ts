@@ -62,4 +62,30 @@ describe("alertSettings api", () => {
 
     await expect(getAlertSettings()).rejects.toThrow(/emailAlertsEnabled/);
   });
+
+  it.each([
+    [{}, "{}"],
+    [{ notificationEmail: undefined, emailAlertsEnabled: undefined }, "{}"],
+    [{ notificationEmail: "" }, '{"notificationEmail":""}'],
+    [
+      { notificationEmail: "  alerts@sen.ai  ", emailAlertsEnabled: false, opaque: "retained" },
+      '{"notificationEmail":"  alerts@sen.ai  ","emailAlertsEnabled":false,"opaque":"retained"}',
+    ],
+  ] as const)("preserves serialization of an existing partial command %j", async (input, body) => {
+    requestJsonMock.mockResolvedValue(backendSettings);
+
+    await updateAlertSettings(Object.freeze(input));
+
+    expect(requestJsonMock).toHaveBeenCalledWith("/auth/me/alert-settings", {
+      method: "PATCH",
+      body,
+    });
+  });
+
+  it("forwards the original transport failure without rewriting it", async () => {
+    const failure = new Error("transport failure");
+    requestJsonMock.mockRejectedValue(failure);
+
+    await expect(updateAlertSettings({ emailAlertsEnabled: false })).rejects.toBe(failure);
+  });
 });

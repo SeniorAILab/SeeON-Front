@@ -1,6 +1,6 @@
 import { KeyRound, RotateCw, Settings2, ShieldX } from "lucide-react";
 
-import { Button, Card } from "@/components/ui/primitives";
+import { Button, Card } from "@/components/ui/Primitives";
 import { formatDateTime } from "@/lib/format";
 import type {
   EdgeCredentialLifecycle,

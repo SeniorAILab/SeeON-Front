@@ -3,9 +3,11 @@ import globals from 'globals'
 import reactHooks from 'eslint-plugin-react-hooks'
 import reactRefresh from 'eslint-plugin-react-refresh'
 import tseslint from 'typescript-eslint'
+import { fileURLToPath } from 'node:url'
+import architecture from './eslint/architecture.mjs'
 
-// Vite react-ts default flat config. Type-checked linting is deliberately off
-// (uses the cheap non-type-aware preset) — `tsc -b` already owns type errors.
+// General linting stays on the non-type-aware preset; architecture checks use
+// the TypeScript project to classify actual module targets and symbol origins.
 export default tseslint.config(
   { ignores: ['dist', 'node_modules', '*.tsbuildinfo'] },
   {
@@ -32,39 +34,45 @@ export default tseslint.config(
       ],
     },
   },
-  // P7 seam ratchet: UI layers (components/pages/hooks) must consume services/*
-  // wrappers, not endpoint mappers directly. Tests may mock endpoints freely.
   {
-    files: ['src/components/**/*.{ts,tsx}', 'src/pages/**/*.{ts,tsx}', 'src/hooks/**/*.{ts,tsx}'],
-    ignores: ['**/*.test.{ts,tsx}', 'src/test/**'],
+    files: ['src/**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}'],
+    languageOptions: {
+      parser: tseslint.parser,
+      parserOptions: {
+        project: './tsconfig.json',
+        tsconfigRootDir: fileURLToPath(new URL('.', import.meta.url)),
+      },
+    },
+    plugins: { architecture },
     rules: {
-      'no-restricted-imports': [
-        'error',
-        {
-          patterns: [
-            {
-              group: ['@/services/api/*', '**/services/api/*'],
-              message:
-                'UI(components/pages/hooks)는 services/api/*를 직접 import하지 말고 services/* 래퍼를 사용하세요 (P7 seam ratchet).',
-            },
-          ],
-        },
-      ],
+      'architecture/feature-public-api': 'error',
+      'architecture/ui-service-boundary': 'error',
+      'architecture/no-production-test-imports': 'error',
+      'architecture/resolvable-imports': 'error',
+      'architecture/ui-role-names': 'error',
+      'architecture/wire-dto-ownership': 'error',
     },
   },
-  // Legacy allowlist: pre-existing seam offenders (Follow-up Issue1 shrinks this).
   {
-    files: [
-      'src/components/layout/AppLayout.tsx',
-      'src/components/layout/StaffLayout.tsx',
-      'src/pages/SuperAdminDashboardPage.tsx',
-      'src/pages/admin/AdminFacilityPage.tsx',
-      'src/pages/admin/AdminMonitorSettingsPage.tsx',
-      'src/pages/admin/AdminSpacesPage.tsx',
-      'src/pages/admin/UsersPage.tsx',
-    ],
+    files: ['src/services/**/*.ts', 'src/features/*/services/**/*.ts'],
+    ignores: ['**/*.test.ts', '**/*.spec.ts'],
     rules: {
-      'no-restricted-imports': 'off',
+      '@typescript-eslint/no-unsafe-assignment': 'error',
+      '@typescript-eslint/no-unsafe-argument': 'error',
+      '@typescript-eslint/no-unsafe-call': 'error',
+      '@typescript-eslint/no-unsafe-member-access': 'error',
+      '@typescript-eslint/no-unsafe-return': 'error',
+      '@typescript-eslint/no-unnecessary-type-assertion': 'error',
+    },
+  },
+  {
+    // Enforce promise ownership at backend workflow seams without changing
+    // the existing browser TTS scheduling and rejection behavior.
+    files: ['src/services/**/*.ts'],
+    ignores: ['**/*.test.ts', '**/*.spec.ts'],
+    rules: {
+      '@typescript-eslint/no-floating-promises': ['error', { ignoreVoid: false }],
+      '@typescript-eslint/no-misused-promises': 'error',
     },
   },
 )

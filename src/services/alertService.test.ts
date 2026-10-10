@@ -12,7 +12,8 @@ vi.mock("./api/alertEndpoints", () => ({
   resolveAlertEndpoint: vi.fn(),
 }));
 
-vi.mock("./api/alertMedia", () => ({
+vi.mock("./api/alertMedia", async (importOriginal) => ({
+  ...await importOriginal<typeof import("./api/alertMedia")>(),
   getAlertMediaEndpoint: vi.fn(),
   recordAlertMediaAccessEndpoint: vi.fn(),
 }));

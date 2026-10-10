@@ -4,7 +4,10 @@ import { useAuthStore } from "@/stores/authStore";
 import { getCurrentFacilityId } from "@/stores/facilityStore";
 import { listAlerts } from "@/services/api/alertEndpoints";
 import { mergeAlertsIntoDashboard } from "@/services/alertMerge";
-import type { DashboardResponse, DashboardSummary, Facility, Floor, Space, SpaceStatus } from "@/types";
+import type { DashboardResponse, DashboardSpace, DashboardSummary, FacilitySummary, Floor, SpaceStatus } from "@/types";
+import type { FacilityResponseDto } from "./facilities/dto/facility-response.dto";
+import type { BackendFloorDto } from "./floors/dto/floor-response.dto";
+import type { BackendSpaceDto } from "./spaces/dto/space-response.dto";
 
 function expectArray<T>(value: unknown, field: string): T[] {
   if (!Array.isArray(value)) throw new Error(`Invalid ${field} response`);
@@ -42,24 +45,24 @@ async function resolveCurrentFacilityId(): Promise<string> {
   throw new Error("현재 시설 정보를 찾을 수 없습니다.");
 }
 
-export async function getCurrentFacility(): Promise<Facility> {
+export async function getCurrentFacility(): Promise<FacilitySummary> {
   const facilityId = await resolveCurrentFacilityId();
-  return (await requestJson(`/facilities/${pathSegment(facilityId)}`)) as Facility;
+  return (await requestJson(`/facilities/${pathSegment(facilityId)}`)) as FacilityResponseDto;
 }
 
-export async function listFacilities(): Promise<Facility[]> {
-  return expectArray<Facility>(await requestJson("/facilities"), "facilities");
+export async function listFacilities(): Promise<FacilitySummary[]> {
+  return expectArray<FacilityResponseDto>(await requestJson("/facilities"), "facilities");
 }
 
 export async function listFloors(): Promise<Floor[]> {
-  return expectArray<Floor>(await requestJson("/floors"), "floors");
+  return expectArray<BackendFloorDto>(await requestJson("/floors"), "floors");
 }
 
-export async function listSpaces(): Promise<Space[]> {
-  return expectArray<Space>(await requestJson("/spaces"), "spaces");
+export async function listSpaces(): Promise<DashboardSpace[]> {
+  return expectArray<BackendSpaceDto>(await requestJson("/spaces"), "spaces");
 }
 
-function statusFromSpace(space: Space): SpaceStatus {
+function statusFromSpace(space: DashboardSpace): SpaceStatus {
   return {
     id: `status-${space.id}`,
     spaceId: space.id,
@@ -79,7 +82,7 @@ function statusFromSpace(space: Space): SpaceStatus {
   };
 }
 
-function buildStatusesFromSpaces(spaces: Space[]): Record<string, SpaceStatus> {
+function buildStatusesFromSpaces(spaces: DashboardSpace[]): Record<string, SpaceStatus> {
   return Object.fromEntries(
     spaces.filter((space) => space.isActive).map((space) => [space.id, statusFromSpace(space)])
   );

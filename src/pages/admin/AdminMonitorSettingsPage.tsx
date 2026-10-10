@@ -2,9 +2,9 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Monitor, ExternalLink } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
-import { Card, Button, Field, Select } from "@/components/ui/primitives";
-import { listFloors } from "@/services/api/floors";
-import { listSpaces } from "@/services/api/spaces";
+import { Card, Button, Field, Select } from "@/components/ui/Primitives";
+import { floorService } from "@/services/floorService";
+import { spaceService } from "@/services/spaceService";
 import { useMonitorSettingsStore } from "@/features/monitor";
 import { useActiveFacilityId } from "@/hooks/useActiveFacilityId";
 import { dashboardPath, floorPath } from "@/lib/routeAccess";
@@ -22,8 +22,8 @@ export function AdminMonitorSettingsPage() {
   useEffect(() => {
     setFloors([]);
     setSpaces([]);
-    listFloors().then(setFloors);
-    listSpaces().then(setSpaces);
+    floorService.listFloors().then(setFloors);
+    spaceService.listSpaces().then(setSpaces);
   }, [facilityId]);
 
   useEffect(() => {

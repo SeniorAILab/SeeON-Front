@@ -1,13 +1,11 @@
 import { requestJson } from "@/services/apiClient";
 import { getCurrentFacilityId } from "@/stores/facilityStore";
 import type { EdgeConnectionState, Facility, FacilityEdgeStatus } from "@/types";
+import type { FacilityResponseDto } from "./facilities/dto/facility-response.dto";
+import type { FacilityEdgeStatusResponseDto } from "./facilities/dto/facility-edge-status-response.dto";
+import type { UpdateFacilityRequestDto } from "./facilities/dto/update-facility-request.dto";
 
-type FacilityResponse = Omit<Facility, "address" | "phone"> & {
-  address: string | null;
-  phone: string | null;
-};
-
-function normalizeFacility(facility: FacilityResponse): Facility {
+function normalizeFacility(facility: FacilityResponseDto): Facility {
   return {
     ...facility,
     address: facility.address ?? "",
@@ -45,7 +43,7 @@ function asNumber(value: unknown, field: string): number {
 }
 
 function mapEdgeStatus(dto: unknown): FacilityEdgeStatus {
-  const value = dto as Record<string, unknown>;
+  const value = dto as FacilityEdgeStatusResponseDto;
   return {
     connectionState: asEdgeConnectionState(value.connectionState, "connectionState"),
     lastHeartbeatAt: asNullableIsoString(value.lastHeartbeatAt, "lastHeartbeatAt"),
@@ -59,7 +57,7 @@ export async function getFacility(id: string): Promise<Facility> {
   const facilityId = getCurrentFacilityId();
   return normalizeFacility((await requestJson(`/facilities/${pathSegment(id)}`, {
     headers: facilityId ? { "X-Facility-Id": facilityId } : {},
-  })) as FacilityResponse);
+  })) as FacilityResponseDto);
 }
 
 export async function updateFacility(
@@ -70,12 +68,12 @@ export async function updateFacility(
   return normalizeFacility((await requestJson(`/facilities/${pathSegment(id)}`, {
     method: "PATCH",
     headers: facilityId ? { "X-Facility-Id": facilityId } : {},
-    body: JSON.stringify(input),
-  })) as FacilityResponse);
+    body: JSON.stringify(input satisfies UpdateFacilityRequestDto),
+  })) as FacilityResponseDto);
 }
 
 export async function listFacilities(): Promise<Facility[]> {
-  return expectArray<FacilityResponse>(await requestJson("/facilities"), "facilities").map(normalizeFacility);
+  return expectArray<FacilityResponseDto>(await requestJson("/facilities"), "facilities").map(normalizeFacility);
 }
 
 export async function getFacilityEdgeStatus(id: string): Promise<FacilityEdgeStatus> {

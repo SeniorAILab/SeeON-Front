@@ -7,12 +7,12 @@ There is no parent monorepo workspace. Root scripts replace the old workspace fi
 
 ```
 src/
-├── features/            # feature folders (monitor, admin-events, dashboard):
+├── features/            # feature folders (monitor, admin-events, dashboard, edge-enrollment):
 │                        # components/hooks/pages/services/stores + index.ts public API
 ├── services/
 │   ├── api/             # endpoint mappers: backend DTO validation + domain mapping
 │   └── *.ts             # service workflows
-├── types/               # index.ts = frontend type mirror of PRD/API contract
+├── types/               # core contract in index.ts + normalized domain/view models
 ├── pages/ components/   # views (shared/cross-feature only; see Guards)
 ├── hooks/ stores/       # reusable hooks and zustand state (shared/cross-feature only)
 ├── lib/                 # utilities
@@ -36,7 +36,7 @@ Read `MIGRATION.md` before claiming deploy readiness or replaying source `front/
   production code must always go through the barrel.
 - Components never call the backend directly. Go through `src/services/*` (the API seam).
 - Backend endpoint calls live under `src/services/api/*`; service files consume endpoint functions instead of scattering `fetch()` or backend JSON casts.
-- `src/types/index.ts` mirrors the PRD/API contract for frontend code. Wire SSOT is backend OpenAPI (see `CONTRACT.md`).
+- `src/types/` holds frontend domain/view contracts, with core types in `index.ts`. Raw wire DTOs stay in domain `src/services/api/<domain>/dto/` folders. Wire SSOT is backend OpenAPI (see `CONTRACT.md`).
 - Dev/prod/test runtime uses the real backend API seam. Do not reintroduce
   frontend mock auth users, localStorage auth sessions, or runtime demo branches.
 - Login in dev/prod is backend-owned email/password auth. It must mint the
@@ -49,7 +49,7 @@ Read `MIGRATION.md` before claiming deploy readiness or replaying source `front/
 
 ## Run
 
-Run every command from this repository root. Node 24.x and `pnpm@10.32.1` are the expected toolchain once the package lane lands.
+Run every command from this repository root. Node 24.x and `pnpm@10.32.1` are the expected toolchain.
 
 ```bash
 pnpm install

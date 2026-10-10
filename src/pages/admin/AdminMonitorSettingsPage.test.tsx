@@ -14,8 +14,14 @@ vi.mock("react-router-dom", async () => {
   return { ...actual, useNavigate: () => mockNavigate };
 });
 vi.mock("@/hooks/useActiveFacilityId", () => ({ useActiveFacilityId: () => facilityId }));
-vi.mock("@/services/api/floors", () => ({ listFloors: vi.fn() }));
-vi.mock("@/services/api/spaces", () => ({ listSpaces: vi.fn() }));
+vi.mock("@/services/api/floors", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/services/api/floors")>(),
+  listFloors: vi.fn(),
+}));
+vi.mock("@/services/api/spaces", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/services/api/spaces")>(),
+  listSpaces: vi.fn(),
+}));
 
 const floors = [
   { id: "fl_1f", facilityId, name: "1F", orderIndex: 1, provisioningSource: "PRODUCT" as const },

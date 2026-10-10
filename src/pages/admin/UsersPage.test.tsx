@@ -81,6 +81,31 @@ describe("UsersPage", () => {
       expect(updateUserRoleMock).toHaveBeenCalledWith("user-1", "STAFF");
     });
   });
+
+  it("submits the selected ADMIN role when creating a user", async () => {
+    createUserMock.mockResolvedValueOnce({
+      user: { id: "user-2", name: "새 관리자", email: "new@example.test", role: "ADMIN", facilityId: null },
+      initialPassword: "Tmp-admin",
+    });
+    render(<UsersPage />);
+
+    const inputs = await screen.findAllByDisplayValue("");
+    fireEvent.change(inputs[0], { target: { value: "새 관리자" } });
+    fireEvent.change(inputs[1], { target: { value: "new@example.test" } });
+    fireEvent.change(screen.getByDisplayValue("요양보호사"), { target: { value: "ADMIN" } });
+    fireEvent.click(screen.getByRole("button", { name: "생성" }));
+
+    await waitFor(() => {
+      expect(createUserMock).toHaveBeenCalledWith({
+        name: "새 관리자",
+        email: "new@example.test",
+        role: "ADMIN",
+      });
+    });
+    expect(await screen.findByText("Tmp-admin")).toBeTruthy();
+  });
+
+
   it("409 API 오류는 원시 JSON 대신 사용자 생성 안내 문구로 표시한다", async () => {
     const rawError = JSON.stringify({
       message: "Email already registered",

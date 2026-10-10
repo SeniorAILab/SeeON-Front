@@ -30,6 +30,27 @@ const spaces = [
   },
 ];
 
+const rawListCases = [
+  {
+    operation: "listFacilities" as const,
+    path: "/facilities",
+    field: "facilities",
+    rows: [null, { ...facility, address: null, phone: null, extra: "kept" }],
+  },
+  {
+    operation: "listFloors" as const,
+    path: "/floors",
+    field: "floors",
+    rows: [null, { ...floors[0], orderIndex: "2.5", extra: "kept" }],
+  },
+  {
+    operation: "listSpaces" as const,
+    path: "/spaces",
+    field: "spaces",
+    rows: [null, { ...spaces[0], assignedStaff: null, capacity: "1.5", extra: "kept" }],
+  },
+];
+
 const residentStatuses = [
   {
     id: "resident-status-1",
@@ -55,9 +76,79 @@ const bedExitAlert = {
 
 describe("dashboardEndpoints", () => {
   beforeEach(() => {
+    vi.restoreAllMocks();
     vi.resetModules();
     vi.unstubAllEnvs();
     vi.unstubAllGlobals();
+  });
+
+  it.each(rawListCases)(
+    "$operation retains raw arrays and rows without element normalization",
+    async ({ operation, path, rows }) => {
+      const expected = rows.map((row) => row === null ? null : { ...row });
+      const client = await import("@/services/apiClient");
+      const request = vi.spyOn(client, "requestJson").mockResolvedValue(rows);
+      const endpoints = await import("./dashboardEndpoints");
+
+      const result = await endpoints[operation]();
+
+      expect(request).toHaveBeenCalledWith(path);
+      expect(result).toBe(rows);
+      expect(result[1]).toBe(rows[1]);
+      expect(result).toEqual(expected);
+    },
+  );
+
+  it.each(rawListCases.flatMap(({ operation, field }) =>
+    [null, {}, "not-an-array"].map((body) => ({ operation, field, body })),
+  ))("$operation retains its outer-array rejection for $body", async ({ operation, field, body }) => {
+    const client = await import("@/services/apiClient");
+    vi.spyOn(client, "requestJson").mockResolvedValue(body);
+    const endpoints = await import("./dashboardEndpoints");
+
+    await expect(endpoints[operation]()).rejects.toThrow(`Invalid ${field} response`);
+  });
+
+  it.each(rawListCases)("$operation preserves transport error identity", async ({ operation }) => {
+    const failure = new Error("transport failure");
+    const client = await import("@/services/apiClient");
+    vi.spyOn(client, "requestJson").mockRejectedValue(failure);
+    const endpoints = await import("./dashboardEndpoints");
+
+    await expect(endpoints[operation]()).rejects.toBe(failure);
+  });
+
+  it.each([
+    { body: { ...facility, address: null, phone: null, extra: "kept" } },
+    { body: null },
+  ])("retains unvalidated current-facility identity for $body", async ({ body }) => {
+    const expected = body === null ? null : { ...body };
+    const client = await import("@/services/apiClient");
+    const request = vi.spyOn(client, "requestJson").mockImplementation(async (path) => {
+      if (path === "/auth/me") {
+        return { id: "user-1", role: "ADMIN", facilityId: facility.id };
+      }
+      return body;
+    });
+    const { getCurrentFacility } = await import("./dashboardEndpoints");
+
+    const result = await getCurrentFacility();
+
+    expect(result).toBe(body);
+    expect(result).toEqual(expected);
+    expect(request).toHaveBeenCalledWith(`/facilities/${facility.id}`);
+  });
+
+  it("retains the missing current-facility error", async () => {
+    const client = await import("@/services/apiClient");
+    vi.spyOn(client, "requestJson").mockResolvedValue({
+      id: "user-1",
+      role: "ADMIN",
+      facilityId: null,
+    });
+    const { getCurrentFacility } = await import("./dashboardEndpoints");
+
+    await expect(getCurrentFacility()).rejects.toThrow("현재 시설 정보를 찾을 수 없습니다.");
   });
 
   it("hydrates room statuses from spaces and overlays room-level alerts without mis-keying resident status", async () => {

@@ -2,14 +2,14 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { LayoutDashboard, LogOut, MonitorPlay } from "lucide-react";
 import { LogoMark } from "@/components/Logo";
-import { Button, Card } from "@/components/ui/primitives";
+import { Button, Card } from "@/components/ui/Primitives";
 import { adminPath, dashboardPath } from "@/lib/routeAccess";
-import { listFacilities } from "@/services/api/dashboardEndpoints";
-import { buildFreshnessBySpace, listCameras } from "@/services/api/cameras";
+import { facilityService } from "@/services/facilityService";
+import { cameraService } from "@/services/cameraService";
 import { apiErrorMessage } from "@/services/apiClient";
 import { useAuthStore } from "@/stores/authStore";
 import { useFacilityStore } from "@/stores/facilityStore";
-import type { Facility } from "@/types";
+import type { FacilitySummary } from "@/types";
 
 export function SuperAdminDashboardPage() {
   const navigate = useNavigate();
@@ -17,7 +17,7 @@ export function SuperAdminDashboardPage() {
   const logout = useAuthStore((s) => s.logout);
   const switchFacility = useFacilityStore((s) => s.switchFacility);
   const setFacilitiesStore = useFacilityStore((s) => s.setFacilities);
-  const [facilities, setFacilities] = useState<Facility[]>([]);
+  const [facilities, setFacilities] = useState<FacilitySummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   // 기사님에게 시설 ID를 불러주는 대신 복사해 전달할 수 있게 한다.
@@ -36,7 +36,7 @@ export function SuperAdminDashboardPage() {
       setLoading(true);
       setError(null);
       try {
-        const nextFacilities = await listFacilities();
+        const nextFacilities = await facilityService.listFacilities();
         if (!active) return;
         setFacilities(nextFacilities);
         setFacilitiesStore(nextFacilities);
@@ -71,10 +71,10 @@ export function SuperAdminDashboardPage() {
       return;
     }
     let active = true;
-    listCameras()
+    cameraService.listCameras()
       .then((cameras) => {
         if (!active) return;
-        const freshness = Object.values(buildFreshnessBySpace(cameras, Date.now()));
+        const freshness = Object.values(cameraService.buildFreshnessBySpace(cameras, Date.now()));
         setCameraHealth({
           total: cameras.length,
           stale: freshness.filter((entry) => entry.connection === "STALE").length,

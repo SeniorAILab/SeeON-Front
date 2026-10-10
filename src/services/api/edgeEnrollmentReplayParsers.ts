@@ -1,12 +1,12 @@
-import {
-  EdgeEnrollmentResponseError,
-  type EdgeCredentialSummary,
-  type EdgeInstallationState,
-  type EdgeInstallationSummary,
-  type EdgeOperationSummary,
-  type IssuedEdgeCredential,
-  type OperationStatus,
-} from "./edgeEnrollmentTypes";
+import { EdgeEnrollmentResponseError } from "@/lib/edgeCredential";
+import type {
+  EdgeCredentialSummary,
+  EdgeInstallationState,
+  EdgeInstallationSummary,
+  EdgeOperationSummary,
+  IssuedEdgeCredential,
+  OperationStatus,
+} from "@/types/edgeEnrollment";
 import {
   readCredentialLifecycle,
   readInstant,

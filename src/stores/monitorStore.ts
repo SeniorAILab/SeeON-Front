@@ -1,7 +1,8 @@
 import { create } from "zustand";
-import { fetchActiveAlertSnapshot, mapAlertDto, resolveAlert, type FrontendAlert } from "@/services/api/alertEndpoints";
+import { fetchActiveAlertSnapshot, mapAlertDto, resolveAlert } from "@/services/api/alertEndpoints";
 import { buildSseUrl, isAbsoluteApiUrl } from "@/services/apiClient";
-import { buildFreshnessBySpace, listCameras, type SpaceFreshness } from "@/services/api/cameras";
+import { buildFreshnessBySpace, listCameras } from "@/services/api/cameras";
+import type { SpaceFreshness } from "@/types/camera";
 import { dashboardService } from "@/services/dashboardService";
 import { recordDashboardDelivery } from "@/services/dashboardReceiptService";
 import {
@@ -18,7 +19,7 @@ import {
 } from "@/services/alertMerge";
 import { useAuthStore } from "@/stores/authStore";
 import { registerFacilityMonitorController, useFacilityStore } from "@/stores/facilityStore";
-import type { ConnectionState, DashboardResponse, DashboardSummary, SpaceStatus } from "@/types";
+import type { ConnectionState, DashboardResponse, DashboardSummary, FrontendAlert, SpaceStatus } from "@/types";
 
 interface MonitorState {
   dashboard: DashboardResponse | null;

@@ -68,6 +68,13 @@ export type DetectionEventType =
 
 // ---------- 엔티티 ----------
 
+export interface FacilitySummary {
+  id: string;
+  name: string;
+  address: string | null;
+  phone: string | null;
+}
+
 export interface Facility {
   id: string;
   name: string;
@@ -95,6 +102,13 @@ export interface Floor {
   provisioningSource: ProvisioningSource;
 }
 
+export type CreateFloorInput = {
+  name: string;
+  orderIndex?: number;
+};
+
+export type UpdateFloorInput = Partial<CreateFloorInput>;
+
 export interface Space {
   id: string;
   facilityId: string;
@@ -106,6 +120,21 @@ export interface Space {
   assignedStaff?: string; // 담당 직원
   provisioningSource: ProvisioningSource;
 }
+
+export type DashboardSpace = Omit<Space, "assignedStaff"> & {
+  assignedStaff?: string | null;
+};
+
+export type CreateSpaceInput = {
+  floorId: string;
+  name: string;
+  type?: SpaceType;
+  capacity?: number;
+  isActive?: boolean;
+  assignedStaff?: string | null;
+};
+
+export type UpdateSpaceInput = Partial<CreateSpaceInput>;
 
 /** 공간의 현재 상태(가장 최신 1건) */
 export interface SpaceStatus {
@@ -155,6 +184,14 @@ export interface DetectionEvent {
   emergency?: boolean; // 응급 이벤트
 }
 
+export type FrontendAlert = DetectionEvent & {
+  alertSeq: string;
+  residentId: string | null;
+  cameraId: string | null;
+  room?: string;
+  backendStatus: string;
+  backendType: string;
+};
 
 export interface AlertRule {
   id: string;
@@ -184,9 +221,9 @@ export interface AuthSession {
 
 /** 대시보드 한 화면을 그리기 위한 합성 응답 */
 export interface DashboardResponse {
-  facility: Facility;
+  facility: FacilitySummary;
   floors: Floor[];
-  spaces: Space[];
+  spaces: DashboardSpace[];
   statuses: Record<string, SpaceStatus>; // key = spaceId
   summary: DashboardSummary;
   unacknowledgedEvents: DetectionEvent[];

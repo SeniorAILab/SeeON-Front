@@ -4,11 +4,11 @@ import { Filter, RefreshCw, AlertTriangle } from "lucide-react";
 import { StatsBar } from "@/features/dashboard/components/StatsBar";
 import { FloorTabs } from "@/features/dashboard/components/FloorTabs";
 import { RoomStatusBoard } from "@/components/status/RoomStatusBoard";
-import { Select } from "@/components/ui/primitives";
+import { Select } from "@/components/ui/Primitives";
 import { useDashboard } from "@/features/dashboard/hooks/useDashboard";
 import { useMonitorStore } from "@/stores/monitorStore";
 import { spaceTypeLabel } from "@/lib/labels";
-import type { Space, SpaceType } from "@/types";
+import type { DashboardSpace, SpaceType } from "@/types";
 import { useActiveFacilityId } from "@/hooks/useActiveFacilityId";
 import { adminPath } from "@/lib/routeAccess";
 
@@ -29,7 +29,7 @@ export function DashboardPage() {
   const navigate = useNavigate();
   const facilityId = useActiveFacilityId();
   const [typeFilter, setTypeFilter] = useState<string>("ALL");
-  const [selected, setSelected] = useState<Space | null>(null);
+  const [selected, setSelected] = useState<DashboardSpace | null>(null);
   const connection = useMonitorStore((s) => s.connection);
   const lastUpdateAt = useMonitorStore((s) => s.lastUpdateAt);
 

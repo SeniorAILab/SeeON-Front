@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { AlertTriangle } from "lucide-react";
 
-import { Button } from "@/components/ui/primitives";
+import { Button } from "@/components/ui/Primitives";
 
 type ConfirmActionDialogProps = {
   readonly title: string;

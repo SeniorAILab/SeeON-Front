@@ -1,5 +1,9 @@
 import type { Role } from "@/types";
 import { requestJson } from "@/services/apiClient";
+import type { IssueEdgeCredentialRequestDto } from "./edge-enrollments/dto/issue-edge-credential-request.dto";
+import type { RotateEdgeCredentialRequestDto } from "./edge-enrollments/dto/rotate-edge-credential-request.dto";
+import type { RevokeEdgeCredentialRequestDto } from "./edge-enrollments/dto/revoke-edge-credential-request.dto";
+import type { ListEdgeCredentialsQueryDto } from "./edge-enrollments/dto/list-edge-credentials-query.dto";
 import {
   parseIssueEdgeCredential,
   parseRedactedEdgeCredentials,
@@ -7,49 +11,20 @@ import {
   parseRotateEdgeCredential,
 } from "./edgeEnrollmentParsers";
 import {
-  type EdgeCredentialLifecycle,
+  type CredentialMutationRequest,
+  type IssueEdgeCredentialRequest,
   type IssuedEdgeCredential,
+  type ListEdgeCredentialsRequest,
   type RedactedEdgeCredential,
+  type RevokeEdgeCredentialRequest,
   type RevokedEdgeCredential,
   type RotatedEdgeCredential,
-} from "./edgeEnrollmentTypes";
-
-export {
-  EdgeEnrollmentResponseError,
-  type EdgeCredentialLifecycle,
-  type IssuedEdgeCredential,
-  type RedactedEdgeCredential,
-  type RevokedEdgeCredential,
-  type RotatedEdgeCredential,
-  type TopologyPreviewStatus,
-} from "./edgeEnrollmentTypes";
+} from "@/types/edgeEnrollment";
 export {
   parseIssueEdgeCredential,
   parseRedactedEdgeCredentials,
   parseTopologyPreviewStatus,
 } from "./edgeEnrollmentParsers";
-
-export type IssueEdgeCredentialRequest = {
-  readonly facilityId: string;
-  readonly idempotencyKey: string;
-  readonly signal?: AbortSignal;
-};
-
-export type ListEdgeCredentialsRequest = {
-  readonly facilityId?: string;
-  readonly lifecycle?: EdgeCredentialLifecycle;
-  readonly signal?: AbortSignal;
-};
-
-export type CredentialMutationRequest = {
-  readonly tokenId: string;
-  readonly idempotencyKey: string;
-  readonly signal?: AbortSignal;
-};
-
-export type RevokeEdgeCredentialRequest = CredentialMutationRequest & {
-  readonly expectedLifecycle: "ACTIVE" | "GRACE";
-};
 
 export async function issueEdgeCredential(
   request: IssueEdgeCredentialRequest,
@@ -59,7 +34,7 @@ export async function issueEdgeCredential(
     mutationOptions({
       idempotencyKey: request.idempotencyKey,
       signal: request.signal,
-      body: { schemaVersion: 1, facilityId: request.facilityId },
+      body: { schemaVersion: 1, facilityId: request.facilityId } satisfies IssueEdgeCredentialRequestDto,
     }),
   );
   return parseIssueEdgeCredential(body);
@@ -70,9 +45,9 @@ export async function listEdgeCredentials(
 ): Promise<readonly RedactedEdgeCredential[]> {
   const query = new URLSearchParams();
   if (request.facilityId !== undefined)
-    query.set("facilityId", request.facilityId);
+    query.set("facilityId", request.facilityId satisfies ListEdgeCredentialsQueryDto["facilityId"]);
   if (request.lifecycle !== undefined)
-    query.set("lifecycle", request.lifecycle);
+    query.set("lifecycle", request.lifecycle satisfies ListEdgeCredentialsQueryDto["lifecycle"]);
   const suffix = query.size === 0 ? "" : `?${query.toString()}`;
   const options: RequestInit = { method: "GET" };
   if (request.signal !== undefined) options.signal = request.signal;
@@ -89,7 +64,7 @@ export async function rotateEdgeCredential(
     mutationOptions({
       idempotencyKey: request.idempotencyKey,
       signal: request.signal,
-      body: { schemaVersion: 1, expectedLifecycle: "ACTIVE" },
+      body: { schemaVersion: 1, expectedLifecycle: "ACTIVE" } satisfies RotateEdgeCredentialRequestDto,
     }),
   );
   return parseRotateEdgeCredential(body);
@@ -107,7 +82,7 @@ export async function revokeEdgeCredential(
         schemaVersion: 1,
         expectedLifecycle: request.expectedLifecycle,
         reason: "ADMIN_REVOKED",
-      },
+      } satisfies RevokeEdgeCredentialRequestDto,
     }),
   );
   return parseRevokeEdgeCredential(body);
@@ -120,7 +95,10 @@ export function canAdministerEdgeCredentials(role: Role | null): boolean {
 function mutationOptions(request: {
   readonly idempotencyKey: string;
   readonly signal: AbortSignal | undefined;
-  readonly body: Record<string, string | number>;
+  readonly body:
+    | IssueEdgeCredentialRequestDto
+    | RotateEdgeCredentialRequestDto
+    | RevokeEdgeCredentialRequestDto;
 }): RequestInit {
   const options: RequestInit = {
     method: "POST",

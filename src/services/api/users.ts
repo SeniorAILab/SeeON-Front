@@ -1,19 +1,9 @@
 import { requestJson } from "@/services/apiClient";
+import type { CreateUserRequestDto } from "./users/dto/create-user-request.dto";
+import type { UpdateUserRoleRequestDto } from "./users/dto/update-user-role-request.dto";
+import type { CreateUserResponseDto, UserDto } from "./users/dto/user-response.dto";
 import type { Role, User } from "@/types";
-
-interface UserDto {
-  id: string;
-  name: string;
-  email: string;
-  role: Role;
-  facilityId?: string | null;
-}
-
-interface CreateUserInput {
-  name: string;
-  email: string;
-  role: Exclude<Role, "SUPER_ADMIN">;
-}
+import type { CreateUserResult } from "@/types/user";
 
 function isRole(value: unknown): value is Role {
   return value === "SUPER_ADMIN" || value === "ADMIN" || value === "STAFF";
@@ -47,12 +37,7 @@ export async function listUsers(): Promise<User[]> {
   return body.map(mapUser);
 }
 
-export interface CreateUserResult {
-  user: User;
-  initialPassword: string;
-}
-
-export async function createUser(input: CreateUserInput): Promise<CreateUserResult> {
+export async function createUser(input: CreateUserRequestDto): Promise<CreateUserResult> {
   const body = await requestJson("/users", {
     method: "POST",
     body: JSON.stringify(input),
@@ -60,14 +45,17 @@ export async function createUser(input: CreateUserInput): Promise<CreateUserResu
   if (
     typeof body !== "object" ||
     body === null ||
-    Array.isArray(body) ||
-    typeof (body as { initialPassword?: unknown }).initialPassword !== "string"
+    Array.isArray(body)
   ) {
     throw new Error("Invalid create user response");
   }
+  const dto = body as CreateUserResponseDto;
+  if (typeof dto.initialPassword !== "string") {
+    throw new Error("Invalid create user response");
+  }
   return {
-    user: mapUser((body as { user?: unknown }).user),
-    initialPassword: (body as { initialPassword: string }).initialPassword,
+    user: mapUser(dto.user),
+    initialPassword: dto.initialPassword,
   };
 }
 
@@ -75,7 +63,7 @@ export async function updateUserRole(id: string, role: Exclude<Role, "SUPER_ADMI
   return mapUser(
     await requestJson(`/users/${encodeURIComponent(id)}/role`, {
       method: "PATCH",
-      body: JSON.stringify({ role }),
+      body: JSON.stringify({ role } satisfies UpdateUserRoleRequestDto),
     }),
   );
 }

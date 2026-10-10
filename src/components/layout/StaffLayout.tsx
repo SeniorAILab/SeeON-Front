@@ -8,7 +8,7 @@ import { canAdmin, roleLabel } from "@/lib/roles";
 import { useFacilityStore, facilitiesForUser } from "@/stores/facilityStore";
 import { useUiStore } from "@/stores/uiStore";
 import { AudioToggleButton, useMonitorSettingsStore } from "@/features/monitor";
-import { listFacilities } from "@/services/api/dashboardEndpoints";
+import { facilityService } from "@/services/facilityService";
 import { FACILITIES_PICKER_PATH, adminPath, alertsPath, floorSelectPath } from "@/lib/routeAccess";
 
 export function StaffLayout() {
@@ -39,7 +39,7 @@ export function StaffLayout() {
       return;
     }
     let cancelled = false;
-    listFacilities()
+    facilityService.listFacilities()
       .then((nextFacilities) => {
         if (!cancelled) setFacilities(nextFacilities);
       })

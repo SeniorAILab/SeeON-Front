@@ -1,9 +1,9 @@
-import {
-  EdgeEnrollmentResponseError,
-  type OwnershipTransferKind,
-  type OwnershipTransferPreview,
-  type TopologyPreviewStatus,
-} from "./edgeEnrollmentTypes";
+import { EdgeEnrollmentResponseError } from "@/lib/edgeCredential";
+import type {
+  OwnershipTransferKind,
+  OwnershipTransferPreview,
+  TopologyPreviewStatus,
+} from "@/types/edgeEnrollment";
 import {
   readEdgeRefs,
   readInstant,

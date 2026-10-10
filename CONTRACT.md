@@ -6,9 +6,10 @@ Backend OpenAPI is the API SSOT for this frontend.
 
 | Surface | Owner | Location |
 | --- | --- | --- |
-| HTTP routes, request/response shapes, auth | Backend | `SeniorAILab/SeeON` generated OpenAPI (`/api/docs`) and committed snapshot `docs/openapi/v1.json` in that monorepo |
-| Controllers that emit the contract | Backend | `backend/src/**/*.controller.ts` in `SeniorAILab/SeeON` |
-| Browser UI types | This repo | `src/types/index.ts` (view/domain mirror, not wire SSOT) |
+| HTTP routes, request/response shapes, auth | Backend | `SeniorAILab/SeeON-Backend` generated OpenAPI (`/api/docs`) and committed snapshot `docs/openapi/v1.json` in that standalone repository |
+| Controllers that emit the contract | Backend | `backend/src/**/*.controller.ts` in `SeniorAILab/SeeON-Backend` |
+| Browser UI/domain types | This repo | `src/types/`, with core types in `index.ts` and domain models in separate modules (not wire SSOT) |
+| Raw wire DTO declarations | This repo | `src/services/api/<domain>/dto/` (hand-written against backend OpenAPI) |
 | Fetch, cookies, 401 handling | This repo | `src/services/apiClient.ts` and `src/services/api/*` |
 | Route tree and facility scope UX | This repo | `src/router.tsx` and guards under `src/components/` |
 
@@ -33,7 +34,7 @@ Coordinate backend and frontend in this order. Never reverse it for "speed".
 
 ### A. Additive backend change (new route or optional field)
 
-1. Land backend OpenAPI + controller + tests in `SeniorAILab/SeeON`.
+1. Land backend OpenAPI + controller + tests in `SeniorAILab/SeeON-Backend`.
 2. Publish/deploy backend so the new shape is live in the target environment.
 3. Update this repo's `src/services/api/*` mapper and any UI that consumes it.
 4. Deploy this frontend after the backend is already serving the additive shape.

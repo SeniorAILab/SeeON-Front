@@ -1,5 +1,4 @@
-import type { DashboardResponse, SpaceStatus } from "@/types";
-import type { FrontendAlert } from "@/services/api/alertEndpoints";
+import type { DashboardResponse, FrontendAlert, SpaceStatus } from "@/types";
 
 const ACTIVE_BACKEND_TYPES = new Set(["fall", "bed-exit"]);
 const RESOLVED_STATUS = "RESOLVED";

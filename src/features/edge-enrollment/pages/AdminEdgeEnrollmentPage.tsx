@@ -3,7 +3,7 @@ import { KeyRound, Plus } from "lucide-react";
 import { Navigate, useParams } from "react-router-dom";
 
 import { PageHeader } from "@/components/PageHeader";
-import { Button, Card } from "@/components/ui/primitives";
+import { Button, Card } from "@/components/ui/Primitives";
 import {
   canAdministerEdgeCredentials,
   issueEdgeCredential,
@@ -14,11 +14,11 @@ import {
   type RedactedEdgeCredential,
 } from "@/services/edgeAdminService";
 import { useAuthStore } from "@/stores/authStore";
-import { ConfirmActionDialog } from "./edge-enrollment/ConfirmActionDialog";
-import { CredentialInventory } from "./edge-enrollment/CredentialInventory";
-import { createIdempotencyKey } from "./edge-enrollment/edgeAdminUi";
-import { InstallationLifecyclePanel } from "./edge-enrollment/InstallationLifecyclePanel";
-import { OneTimeCredentialDialog } from "./edge-enrollment/OneTimeCredentialDialog";
+import { ConfirmActionDialog } from "../components/ConfirmActionDialog";
+import { CredentialInventory } from "../components/CredentialInventory";
+import { createIdempotencyKey } from "../lib/edgeAdminUi";
+import { InstallationLifecyclePanel } from "../components/InstallationLifecyclePanel";
+import { OneTimeCredentialDialog } from "../components/OneTimeCredentialDialog";
 
 type Handoff = {
   readonly credential: OneTimeCredential;

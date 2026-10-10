@@ -1,7 +1,5 @@
-import {
-  EdgeEnrollmentResponseError,
-  type EdgeCredentialLifecycle,
-} from "./edgeEnrollmentTypes";
+import { EdgeEnrollmentResponseError } from "@/lib/edgeCredential";
+import type { EdgeCredentialLifecycle } from "@/types/edgeEnrollment";
 
 const UUID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
@@ -126,7 +124,7 @@ export function readEdgeRefs(
   const values = record[field];
   if (
     !Array.isArray(values) ||
-    values.some((value) => typeof value !== "string" || !EDGE_REF.test(value))
+    !values.every((value: unknown): value is string => typeof value === "string" && EDGE_REF.test(value))
   ) {
     throw new EdgeEnrollmentResponseError(`${field} must be an edge-ref array`);
   }

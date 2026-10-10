@@ -3,15 +3,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ApiError } from "@/services/apiClient";
 import { alertService } from "@/services/alertService";
-import type { AlertMediaMetadata } from "@/services/api/alertMedia";
+import type { AlertMediaMetadata } from "@/types/alertMedia";
 import { AlertEvidencePanel } from "./AlertEvidencePanel";
 
-vi.mock("@/services/alertService", () => ({
-  alertService: {
-    getMedia: vi.fn(),
-    recordMediaAccess: vi.fn(),
-  },
-}));
+vi.mock("@/services/alertService", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/services/alertService")>();
+  return {
+    ...actual,
+    alertService: {
+      ...actual.alertService,
+      getMedia: vi.fn(),
+      recordMediaAccess: vi.fn(),
+    },
+  };
+});
 
 class TestSetupError extends Error {
   readonly name = "TestSetupError";

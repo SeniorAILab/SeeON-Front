@@ -10,3 +10,6 @@ vite.config.ts.timestamp-*.mjs
 npm-debug.log*
 .vite
 test-results/
+/.gjc/_session-*/
+/.gjc/state/
+/.clawhip/state/

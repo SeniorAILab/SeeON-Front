@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { AlertMediaDownloadError } from "@/lib/alertMediaErrors";
 
 import {
-  AlertMediaDownloadError,
   downloadAlertMediaAttachment,
 } from "./alertMediaDownloads";
 

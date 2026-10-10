@@ -1,13 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { Download } from "lucide-react";
 
-import { Button } from "@/components/ui/primitives";
+import { Button } from "@/components/ui/Primitives";
 import {
   AlertMediaDownloadError,
-  canDownloadAlertAttachment,
-  downloadAlertMediaAttachment,
+  alertService,
   type AlertMediaDownloadErrorCode,
-} from "@/services/api/alertMediaDownloads";
+} from "@/services/alertService";
 import { useAuthStore } from "@/stores/authStore";
 
 type DownloadState =
@@ -23,7 +22,7 @@ export function AlertMediaDownloadButton({ alertId }: { readonly alertId: string
 
   useEffect(() => () => controllerRef.current?.abort(), []);
 
-  if (!canDownloadAlertAttachment(role)) return null;
+  if (!alertService.canDownloadAttachment(role)) return null;
 
   async function handleDownload(): Promise<void> {
     controllerRef.current?.abort();
@@ -31,7 +30,7 @@ export function AlertMediaDownloadButton({ alertId }: { readonly alertId: string
     controllerRef.current = controller;
     setState({ kind: "downloading" });
     try {
-      const attachment = await downloadAlertMediaAttachment({
+      const attachment = await alertService.downloadAttachment({
         alertId,
         signal: controller.signal,
       });

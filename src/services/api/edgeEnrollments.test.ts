@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { requestJson } from "@/services/apiClient";
+import { EdgeEnrollmentResponseError } from "@/lib/edgeCredential";
 import {
-  EdgeEnrollmentResponseError,
   canAdministerEdgeCredentials,
   issueEdgeCredential,
   listEdgeCredentials,

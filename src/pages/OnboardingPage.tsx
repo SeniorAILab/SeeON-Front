@@ -3,7 +3,7 @@ import { Navigate, useNavigate } from "react-router-dom";
 import { Building2, ShieldCheck } from "lucide-react";
 import { LogoMark } from "@/components/Logo";
 import { PrivacyNotice } from "@/components/PrivacyNotice";
-import { Button, Card, Field, Input } from "@/components/ui/primitives";
+import { Button, Card, Field, Input } from "@/components/ui/Primitives";
 import { defaultPathForUser } from "@/lib/routeAccess";
 import { useAuthStore } from "@/stores/authStore";
 import { useFacilityStore } from "@/stores/facilityStore";

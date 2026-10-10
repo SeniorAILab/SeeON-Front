@@ -1,8 +1,8 @@
 import type {
   EdgeOperationSummary,
-  OneTimeCredential,
   OwnershipTransferKind,
-} from "./edgeEnrollmentTypes";
+} from "./edgeEnrollment";
+import type { OneTimeCredential } from "@/lib/edgeCredential";
 
 type ReplacementBase = {
   readonly operation: EdgeOperationSummary;
@@ -28,6 +28,24 @@ export type OwnershipTransferManifestItem = {
   readonly edgeRef: string;
   readonly canonicalId: string;
   readonly parentCanonicalId: string | null;
+};
+
+export type InstallationMutationRequest = {
+  readonly edgeInstallationId: string;
+  readonly idempotencyKey: string;
+  readonly signal?: AbortSignal;
+};
+
+export type ReplaceEdgeInstallationRequest = InstallationMutationRequest & {
+  readonly expectedEnrollmentGeneration: number;
+  readonly newClientInstallationRef: string;
+};
+
+export type TransferEdgeOwnershipRequest = InstallationMutationRequest & {
+  readonly expectedEnrollmentGeneration: number;
+  readonly expectedServerRevision: number;
+  readonly manifestDigest: string;
+  readonly manifest: readonly OwnershipTransferManifestItem[];
 };
 
 export type EdgeOwnershipTransfer = {

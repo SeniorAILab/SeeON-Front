@@ -3,7 +3,7 @@ import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { ShieldCheck, UserPlus } from "lucide-react";
 import { LogoMark } from "@/components/Logo";
 import { PrivacyNotice } from "@/components/PrivacyNotice";
-import { Button, Card, Field, Input } from "@/components/ui/primitives";
+import { Button, Card, Field, Input } from "@/components/ui/Primitives";
 import { defaultPathForUser } from "@/lib/routeAccess";
 import { useFacilityStore } from "@/stores/facilityStore";
 import { useUiStore } from "@/stores/uiStore";

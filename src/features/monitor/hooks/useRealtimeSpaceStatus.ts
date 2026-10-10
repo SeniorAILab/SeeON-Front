@@ -2,13 +2,13 @@ import { useEffect, useMemo } from "react";
 import { useMonitorStore } from "@/stores/monitorStore";
 import { useMonitorSettingsStore } from "@/features/monitor/stores/monitorSettingsStore";
 import { attentionRank } from "@/lib/staffCopy";
-import type { DashboardSummary, Space, SpaceStatus } from "@/types";
+import type { DashboardSummary, DashboardSpace, SpaceStatus } from "@/types";
 
 /**
  * 모니터용 실시간 상태 구독 훅.
  * 엔진을 시작하고, 주어진 공간 목록에 대해 라이브 상태/요약을 반환한다.
  */
-export function useRealtimeSpaceStatus(facilityId: string, spaces: Space[]) {
+export function useRealtimeSpaceStatus(facilityId: string, spaces: DashboardSpace[]) {
   const start = useMonitorStore((s) => s.start);
   const stop = useMonitorStore((s) => s.stop);
   const statuses = useMonitorStore((s) => s.statuses);

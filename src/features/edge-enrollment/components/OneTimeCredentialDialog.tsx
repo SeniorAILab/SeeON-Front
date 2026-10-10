@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Copy, KeyRound, X } from "lucide-react";
 
-import { Button } from "@/components/ui/primitives";
+import { Button } from "@/components/ui/Primitives";
 import type { OneTimeCredential } from "@/services/edgeAdminService";
 
 type OneTimeCredentialDialogProps = {

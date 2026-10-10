@@ -1,15 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ApiError, requestJson, requestResponse } from "@/services/apiClient";
+import { AlertMediaResponseError, AlertMediaDownloadError } from "@/lib/alertMediaErrors";
 import {
-  AlertMediaResponseError,
   buildAlertMediaContentPath,
   getAlertMediaEndpoint,
   parseAlertMedia,
   recordAlertMediaAccessEndpoint,
 } from "./alertMedia";
 import {
-  AlertMediaDownloadError,
   canDownloadAlertAttachment,
   downloadAlertMediaAttachment,
 } from "./alertMediaDownloads";
@@ -93,6 +92,29 @@ describe("alert media API seam", () => {
       },
     );
   });
+
+  it("forwards access cancellation without serializing controls or extra request fields", async () => {
+    const controller = new AbortController();
+    const request = {
+      alertId: "alert/a b",
+      action: "PLAY_STARTED" as const,
+      interactionId: "",
+      signal: controller.signal,
+      extra: "not-a-body-field",
+    };
+    requestJsonMock.mockResolvedValue({ accepted: true });
+
+    await expect(recordAlertMediaAccessEndpoint(request)).resolves.toBeUndefined();
+
+    expect(requestJsonMock).toHaveBeenCalledWith(
+      "/alerts/alert%2Fa%20b/media/access",
+      {
+        method: "POST",
+        body: '{"action":"PLAY_STARTED","interactionId":""}',
+        signal: controller.signal,
+      },
+    );
+  });
 });
 
 describe("alert media attachment download", () => {
@@ -169,6 +191,93 @@ describe("alert media attachment download", () => {
 });
 
 describe("parseAlertMedia", () => {
+  it.each([{ value: null }, { value: [] }, { value: "not-an-object" }])(
+    "rejects malformed roots before field parsing: $value",
+    ({ value }) => {
+      expect(() => parseAlertMedia(value, "alert-1")).toThrow("root must be an object");
+    },
+  );
+
+  it("checks alert identity before status parsing and exact-key validation", () => {
+    expect(() =>
+      parseAlertMedia({ alertId: "other-alert", status: 42, extra: true }, "alert-1"),
+    ).toThrow("alertId does not match request");
+  });
+
+  it("rejects an empty alert identifier even when it matches the requested value", () => {
+    expect(() => parseAlertMedia({ status: "UNAVAILABLE", alertId: "" }, "")).toThrow(
+      "alertId must be a non-empty string",
+    );
+  });
+
+  it.each([0, Number.MAX_SAFE_INTEGER + 1, 1e20])(
+    "accepts nonnegative integer retry %s without imposing a safe-integer cap",
+    (retryAfterSeconds) => {
+      const response = { status: "PENDING", alertId: "alert-1", retryAfterSeconds };
+      expect(parseAlertMedia(response, "alert-1")).toEqual(response);
+    },
+  );
+
+  it.each([-1, 0.5, "0", Infinity])("rejects invalid retry %s", (retryAfterSeconds) => {
+    expect(() =>
+      parseAlertMedia({ status: "PENDING", alertId: "alert-1", retryAfterSeconds }, "alert-1"),
+    ).toThrow("retryAfterSeconds must be a non-negative integer or null");
+  });
+
+  it.each(["", ".1", ".12", ".123"])("accepts UTC instants with fraction %s", (fraction) => {
+    const response = {
+      status: "EXPIRED",
+      alertId: "alert-1",
+      expiredAt: `2026-07-16T00:00:00${fraction}Z`,
+    };
+    expect(parseAlertMedia(response, "alert-1")).toEqual(response);
+  });
+
+  it.each([
+    "2026-07-16T00:00:00+00:00",
+    "2026-07-16T00:00:00.1234Z",
+    "2026-99-16T00:00:00Z",
+  ])("retains UTC syntax and finite-date rejection for %s", (expiredAt) => {
+    expect(() =>
+      parseAlertMedia({ status: "EXPIRED", alertId: "alert-1", expiredAt }, "alert-1"),
+    ).toThrow("expiredAt must be an RFC3339 UTC instant");
+  });
+
+  it("rejects an empty timestamp before the UTC syntax check", () => {
+    expect(() =>
+      parseAlertMedia({ status: "DELETED", alertId: "alert-1", deletedAt: "" }, "alert-1"),
+    ).toThrow("deletedAt must be a non-empty string");
+  });
+
+  it.each([READY_RESPONSE.clip.clipStartAt, READY_RESPONSE.clip.clipEndAt])(
+    "accepts inclusive detection boundary %s and an independent fractional duration",
+    (detectedAt) => {
+      const response = {
+        ...READY_RESPONSE,
+        clip: { ...READY_RESPONSE.clip, detectedAt, durationSeconds: 0.5 },
+      };
+      expect(parseAlertMedia(response, "alert-1")).toEqual(response);
+    },
+  );
+
+  it.each([
+    { status: "UNAVAILABLE", alertId: "alert-1", extra: true },
+    { status: "PENDING", alertId: "alert-1" },
+  ])("retains exact root-key validation for %j", (response) => {
+    expect(() => parseAlertMedia(response, "alert-1")).toThrow(
+      "response contains unexpected fields",
+    );
+  });
+
+  it("retains separate metadata and clip copies after validation", () => {
+    const media = parseAlertMedia(READY_RESPONSE, "alert-1");
+
+    expect(media).toEqual(READY_RESPONSE);
+    expect(media).not.toBe(READY_RESPONSE);
+    if (media.status !== "READY") throw new Error("Expected READY metadata");
+    expect(media.clip).not.toBe(READY_RESPONSE.clip);
+  });
+
   it.each([
     [
       { status: "PENDING", alertId: "alert-1", retryAfterSeconds: null },

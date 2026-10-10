@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
-import { Button, Card, Field, Input } from "@/components/ui/primitives";
+import { Button, Card, Field, Input } from "@/components/ui/Primitives";
 import { getAlertSettings, updateAlertSettings } from "@/services/alertSettingsService";
 import type { AlertSettings } from "@/services/alertSettingsService";
 

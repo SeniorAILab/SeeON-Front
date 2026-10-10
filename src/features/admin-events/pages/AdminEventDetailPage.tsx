@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { apiErrorMessage } from "@/services/apiClient";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Film } from "lucide-react";
-import { Card, Button } from "@/components/ui/primitives";
+import { Card, Button } from "@/components/ui/Primitives";
 import { RiskBadge } from "@/components/RiskBadge";
 import { AlertStatusBadge } from "@/components/AlertStatusBadge";
 import { AIInsightBox } from "@/features/admin-events/components/AIInsightBox";
@@ -20,7 +20,7 @@ import type {
   DetectionEvent,
   Floor,
   Level,
-  Space,
+  DashboardSpace,
   SpaceStatusLevel,
 } from "@/types";
 
@@ -37,7 +37,7 @@ export function AdminEventDetailPage() {
 
   const [event, setEvent] = useState<DetectionEvent | null>(null);
   const [timeline, setTimeline] = useState<DetectionEvent[]>([]);
-  const [space, setSpace] = useState<Space | null>(null);
+  const [space, setSpace] = useState<DashboardSpace | null>(null);
   const [floor, setFloor] = useState<Floor | null>(null);
   const [acknowledging, setAcknowledging] = useState(false);
   // 확인 완료 실패 사유. catch가 없으면 실패해도 화면이 조용해서

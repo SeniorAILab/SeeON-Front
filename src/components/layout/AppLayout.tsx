@@ -18,7 +18,7 @@ import { LogoMark } from "@/components/Logo";
 import { useAuthStore } from "@/stores/authStore";
 import { canAdmin, roleLabel } from "@/lib/roles";
 import { useFacilityStore, facilitiesForUser } from "@/stores/facilityStore";
-import { listFacilities } from "@/services/api/dashboardEndpoints";
+import { facilityService } from "@/services/facilityService";
 import { FACILITIES_PICKER_PATH, adminPath, dashboardPath } from "@/lib/routeAccess";
 
 function duplicateFacilityNames(facilities: { name: string }[]) {
@@ -30,7 +30,7 @@ function duplicateFacilityNames(facilities: { name: string }[]) {
 }
 
 function facilityOptionLabel(
-  facility: { id: string; name: string; address: string },
+  facility: { id: string; name: string; address: string | null },
   duplicatedNames: Set<string>,
 ) {
   if (!duplicatedNames.has(facility.name)) return facility.name;
@@ -63,7 +63,7 @@ export function AppLayout() {
       return;
     }
     let cancelled = false;
-    listFacilities()
+    facilityService.listFacilities()
       .then((nextFacilities) => {
         if (!cancelled) setFacilities(nextFacilities);
       })

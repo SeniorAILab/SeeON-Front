@@ -98,4 +98,65 @@ describe("dashboardReceiptService", () => {
   it("keeps one dashboard client id across calls", () => {
     expect(getDashboardClientId()).toBe(getDashboardClientId());
   });
+
+  it.each([
+    {
+      deliveryId: "",
+      backendEventId: "",
+      alertId: "",
+      alertSeq: "",
+      kind: "delivery",
+    },
+    {
+      deliveryId: "delivery-unchecked",
+      backendEventId: "another-event",
+      alertId: "another-alert",
+      alertSeq: "unparsed-sequence",
+      kind: "delivery",
+      presentationId: 42,
+      surface: null,
+      observedAt: 17,
+      recordedAt: [],
+      duplicate: "unchecked",
+      extra: "retained",
+    },
+    Object.assign([], {
+      deliveryId: "array-delivery",
+      backendEventId: "array-event",
+      alertId: "array-alert",
+      alertSeq: "0",
+      kind: "delivery",
+    }),
+  ])("retains the existing partial-validation and identity contract %#", async (response) => {
+    requestJsonMock.mockResolvedValue(response);
+
+    const result = await recordDashboardDelivery(alert("receipt-preservation"));
+
+    expect(result).toBe(response);
+    expect(await recordDashboardDelivery(alert("receipt-preservation"))).toBe(response);
+    expect(requestJsonMock).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    null,
+    {},
+    { deliveryId: 1, backendEventId: "event", alertId: "alert", alertSeq: "1", kind: "delivery" },
+    { deliveryId: "id", backendEventId: null, alertId: "alert", alertSeq: "1", kind: "delivery" },
+    { deliveryId: "id", backendEventId: "event", alertId: 1, alertSeq: "1", kind: "delivery" },
+    { deliveryId: "id", backendEventId: "event", alertId: "alert", alertSeq: 1, kind: "delivery" },
+    { deliveryId: "id", backendEventId: "event", alertId: "alert", alertSeq: "1", kind: "presentation" },
+  ])("preserves rejection of an invalid receipt identity %#", async (response) => {
+    requestJsonMock.mockResolvedValue(response);
+
+    await expect(recordDashboardDelivery(alert("invalid-receipt"))).rejects.toThrow(
+      "Invalid dashboard receipt response",
+    );
+  });
+
+  it("propagates the original receipt transport error", async () => {
+    const failure = new Error("receipt transport failure");
+    requestJsonMock.mockRejectedValue(failure);
+
+    await expect(recordDashboardDelivery(alert("failed-receipt"))).rejects.toBe(failure);
+  });
 });

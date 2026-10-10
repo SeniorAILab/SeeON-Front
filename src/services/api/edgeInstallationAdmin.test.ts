@@ -24,7 +24,9 @@ const OPERATION = {
 } as const;
 
 describe("edge installation admin API seam", () => {
-  beforeEach(() => requestJsonMock.mockReset());
+  beforeEach(() => {
+    requestJsonMock.mockReset();
+  });
 
   it("replaces an installation and returns a consumable one-time credential", async () => {
     requestJsonMock.mockResolvedValue({
@@ -60,6 +62,106 @@ describe("edge installation admin API seam", () => {
     if (result.kind !== "initial") return;
     expect(result.oneTimeCredential.consume()).toBe(ONE_TIME_VALUE);
     expect(result.oneTimeCredential.consume()).toBeNull();
+  });
+
+  it.each([
+    { generation: -1.5, serialized: "-1.5" },
+    { generation: NaN, serialized: "null" },
+    { generation: Infinity, serialized: "null" },
+  ])("preserves replacement serialization for generation $generation", async ({ generation, serialized }) => {
+    const failure = new Error("transport failure");
+    const controller = new AbortController();
+    requestJsonMock.mockRejectedValue(failure);
+    const request = {
+      edgeInstallationId: "installation/a b",
+      expectedEnrollmentGeneration: generation,
+      newClientInstallationRef: "",
+      idempotencyKey: " untrimmed-key ",
+      signal: controller.signal,
+      extra: "not-a-body-field",
+    };
+
+    await expect(replaceEdgeInstallation(request)).rejects.toBe(failure);
+
+    expect(requestJsonMock).toHaveBeenCalledWith(
+      "/admin/edge-installations/installation%2Fa%20b/replace",
+      {
+        method: "POST",
+        headers: { "Idempotency-Key": " untrimmed-key " },
+        body: `{"schemaVersion":1,"expectedEnrollmentGeneration":${serialized},"newClientInstallationRef":""}`,
+        signal: controller.signal,
+      },
+    );
+    expect(requestJsonMock.mock.calls[0][1]?.signal).toBe(controller.signal);
+  });
+
+  it("preserves transfer manifest order, item extras, null parents and unvalidated values", async () => {
+    const failure = new Error("transport failure");
+    const controller = new AbortController();
+    requestJsonMock.mockRejectedValue(failure);
+    const manifest = [
+      {
+        kind: "CAMERA",
+        edgeRef: "z-camera",
+        canonicalId: "",
+        parentCanonicalId: null,
+        extra: "kept",
+      },
+      {
+        kind: "CAMERA",
+        edgeRef: "a-camera",
+        canonicalId: " id ",
+        parentCanonicalId: " parent ",
+      },
+    ] as const;
+    const request = {
+      edgeInstallationId: "installation/a b",
+      expectedEnrollmentGeneration: -0.5,
+      expectedServerRevision: NaN,
+      manifestDigest: "",
+      manifest,
+      idempotencyKey: " untrimmed-key ",
+      signal: controller.signal,
+      extra: "not-a-body-field",
+    };
+
+    await expect(transferEdgeOwnership(request)).rejects.toBe(failure);
+
+    expect(requestJsonMock).toHaveBeenCalledWith(
+      "/admin/edge-installations/installation%2Fa%20b/transfers",
+      {
+        method: "POST",
+        headers: { "Idempotency-Key": " untrimmed-key " },
+        body: '{"schemaVersion":1,"expectedEnrollmentGeneration":-0.5,"expectedServerRevision":null,"manifestDigest":"","manifest":[{"kind":"CAMERA","edgeRef":"z-camera","canonicalId":"","parentCanonicalId":null,"extra":"kept"},{"kind":"CAMERA","edgeRef":"a-camera","canonicalId":" id ","parentCanonicalId":" parent "}]}',
+        signal: controller.signal,
+      },
+    );
+    expect(requestJsonMock.mock.calls[0][1]?.signal).toBe(controller.signal);
+  });
+
+  it("omits an explicitly undefined signal and forwards an empty manifest", async () => {
+    const failure = new Error("transport failure");
+    requestJsonMock.mockRejectedValue(failure);
+
+    await expect(transferEdgeOwnership({
+      edgeInstallationId: INSTALLATION_ID,
+      expectedEnrollmentGeneration: 0,
+      expectedServerRevision: 0,
+      manifestDigest: " untrimmed-digest ",
+      manifest: [],
+      idempotencyKey: OPERATION_ID,
+      signal: undefined,
+    })).rejects.toBe(failure);
+
+    expect(requestJsonMock).toHaveBeenCalledWith(
+      `/admin/edge-installations/${INSTALLATION_ID}/transfers`,
+      {
+        method: "POST",
+        headers: { "Idempotency-Key": OPERATION_ID },
+        body: '{"schemaVersion":1,"expectedEnrollmentGeneration":0,"expectedServerRevision":0,"manifestDigest":" untrimmed-digest ","manifest":[]}',
+      },
+    );
+    expect(requestJsonMock.mock.calls[0][1]).not.toHaveProperty("signal");
   });
 
   it("submits the confirmed ownership-transfer manifest", async () => {

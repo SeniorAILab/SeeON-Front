@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { EdgeEnrollmentResponseError } from "@/lib/edgeCredential";
 
 import {
-  EdgeEnrollmentResponseError,
   parseTopologyPreviewStatus,
 } from "./edgeEnrollments";
 

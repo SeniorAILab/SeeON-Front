@@ -3,7 +3,7 @@ import { RoomActionPanel } from "./RoomActionPanel";
 import { RoomStatusTreemap } from "./RoomStatusTreemap";
 import { compareAlertSeq } from "@/services/alertMerge";
 import type { DashboardReceiptSurfaceBase } from "@/services/dashboardReceiptService";
-import type { ConnectionState, DetectionEvent, Floor, Space, SpaceStatus } from "@/types";
+import type { ConnectionState, DetectionEvent, Floor, DashboardSpace, SpaceStatus } from "@/types";
 
 const DEBOUNCE_MS = 2000;
 type RoomStatusLayout = "overview" | "focus";
@@ -18,7 +18,7 @@ export function connectionChipLabel(connection: ConnectionState, lastUpdateAt: s
 }
 
 
-function signature(spaces: Space[], statuses: Record<string, SpaceStatus>): string {
+function signature(spaces: DashboardSpace[], statuses: Record<string, SpaceStatus>): string {
   return spaces
     .map((space) => `${space.id}:${statuses[space.id]?.status ?? "STABLE"}:${statuses[space.id]?.emergency ? 1 : 0}`)
     .sort()
@@ -50,7 +50,7 @@ function mergeImmediateRiskUpdates(
   return next;
 }
 
-export function useDebouncedStatuses(spaces: Space[], statuses: Record<string, SpaceStatus>, delayMs = DEBOUNCE_MS) {
+export function useDebouncedStatuses(spaces: DashboardSpace[], statuses: Record<string, SpaceStatus>, delayMs = DEBOUNCE_MS) {
   const [visible, setVisible] = useState(statuses);
   const sig = useMemo(() => signature(spaces, statuses), [spaces, statuses]);
   useEffect(() => {
@@ -81,7 +81,7 @@ export function RoomStatusBoard({
   onResolved,
   layout = "overview",
 }: {
-  spaces: Space[];
+  spaces: DashboardSpace[];
   statuses: Record<string, SpaceStatus>;
   floors: Floor[];
   alertsBySpace?: Record<string, DetectionEvent[]>;
@@ -89,8 +89,8 @@ export function RoomStatusBoard({
   lastUpdateAt: string | null;
   variant?: "staff" | "admin";
   cardSize?: "lg" | "xl";
-  selectedSpace?: Space | null;
-  onSelectSpace?: (space: Space) => void;
+  selectedSpace?: DashboardSpace | null;
+  onSelectSpace?: (space: DashboardSpace) => void;
   onClosePanel?: () => void;
   onResolved?: () => void;
   layout?: RoomStatusLayout;

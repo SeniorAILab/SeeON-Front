@@ -1,52 +1,11 @@
 import type { Role } from "@/types";
 import { ApiError, requestResponse } from "@/services/apiClient";
-
-export type AlertMediaDownloadRequest = {
-  readonly alertId: string;
-  readonly signal?: AbortSignal;
-};
-
-type AlertMediaAttachmentBase = {
-  readonly content: Blob;
-  readonly filename: string;
-  readonly contentType: "video/mp4";
-  readonly byteLength: number;
-};
-
-export type FullAlertMediaAttachment = AlertMediaAttachmentBase & {
-  readonly kind: "full";
-};
-
-export type PartialAlertMediaAttachment = AlertMediaAttachmentBase & {
-  readonly kind: "partial";
-  readonly range: {
-    readonly start: number;
-    readonly end: number;
-    readonly total: number;
-  };
-};
-
-export type AlertMediaAttachment =
-  | FullAlertMediaAttachment
-  | PartialAlertMediaAttachment;
-
-export type AlertMediaDownloadErrorCode =
-  | "UNAUTHORIZED"
-  | "FORBIDDEN"
-  | "UNAVAILABLE"
-  | "RANGE_NOT_SATISFIABLE"
-  | "UNEXPECTED";
-
-export class AlertMediaDownloadError extends Error {
-  readonly name = "AlertMediaDownloadError";
-
-  constructor(
-    readonly status: number,
-    readonly code: AlertMediaDownloadErrorCode,
-  ) {
-    super("Alert media attachment download failed.");
-  }
-}
+import { AlertMediaDownloadError, type AlertMediaDownloadErrorCode } from "@/lib/alertMediaErrors";
+import type {
+  AlertMediaAttachment,
+  AlertMediaDownloadRequest,
+  PartialAlertMediaAttachment,
+} from "@/types/alertMedia";
 
 export async function downloadAlertMediaAttachment(
   request: AlertMediaDownloadRequest,

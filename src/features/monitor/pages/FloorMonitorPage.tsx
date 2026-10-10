@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Button } from "@/components/ui/primitives";
+import { Button } from "@/components/ui/Primitives";
 import { Navigate, useParams } from "react-router-dom";
 import { MonitorHeader } from "@/features/monitor/components/MonitorHeader";
 
@@ -12,7 +12,7 @@ import { useMonitorSettingsStore } from "@/features/monitor/stores/monitorSettin
 import { useAuthStore } from "@/stores/authStore";
 import { useFacilityStore } from "@/stores/facilityStore";
 import { ACCESS_DENIED_PATH, floorPath } from "@/lib/routeAccess";
-import type { Facility, Floor, Space } from "@/types";
+import type { FacilitySummary, Floor, DashboardSpace } from "@/types";
 
 
 
@@ -31,10 +31,10 @@ export function FloorMonitorPage({ allView = false }: { allView?: boolean }) {
   const defaultFloorId = useMonitorSettingsStore((s) => s.defaultFloorId);
   const updateSettings = useMonitorSettingsStore((s) => s.update);
 
-  const [facility, setFacility] = useState<Facility | null>(null);
+  const [facility, setFacility] = useState<FacilitySummary | null>(null);
   const [floors, setFloors] = useState<Floor[]>([]);
-  const [allSpaces, setAllSpaces] = useState<Space[]>([]);
-  const [selected, setSelected] = useState<Space | null>(null);
+  const [allSpaces, setAllSpaces] = useState<DashboardSpace[]>([]);
+  const [selected, setSelected] = useState<DashboardSpace | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   useEffect(() => {
@@ -225,7 +225,7 @@ export function FloorMonitorPage({ allView = false }: { allView?: boolean }) {
   );
 }
 
-function floorLabel(floorId: string | undefined, spaces: Space[]): string {
+function floorLabel(floorId: string | undefined, spaces: DashboardSpace[]): string {
   const list = spaces.filter((s) => s.floorId === floorId);
   const hasRoom = list.some((s) => s.type === "ROOM");
   if (hasRoom) return "생활실";

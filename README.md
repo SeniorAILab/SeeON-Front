@@ -94,7 +94,7 @@ Canonical 경로:
 이 기능은 **"실시간 CCTV 관제"가 아니라 "AI 위험 감지 근거 영상 확인"**입니다. AI가 위험으로 감지한 **이벤트 구간(감지 10초 전 ~ 10초 후, 약 20초)** 클립만 관리자에게 제공합니다.
 
 - **권한 분리**: STAFF는 영상 영역 자체가 없고 "영상은 관리자만 확인할 수 있습니다" 안내만 표시. ADMIN/SUPER_ADMIN만 이벤트 상세(`/facilities/:facilityId/admin/events/:eventId`)에서 근거 UI를 볼 수 있습니다.
-- **현재 백엔드 계약**: 영상 presign/access-log 전용 API는 아직 없을 수 있습니다. 스냅샷·미디어는 OpenAPI에 게시된 경로만 사용합니다.
+- **프론트 연동 경로**: 기본 `/api/v1` 아래 `GET /alerts/:alertId/media`로 메타데이터를 조회하고, 인증된 `/alerts/:alertId/media/content`로 영상을 읽으며, `POST /alerts/:alertId/media/access`에 `action`과 `interactionId`를 보냅니다. 실제 배포 환경의 제공 여부와 HTTP 계약은 백엔드 OpenAPI로 확인합니다.
 - **프론트 보안 경계**: 프론트 라우트 가드는 UX 목적입니다. 최종 권한은 백엔드 JWT/facility/RBAC 가드가 강제합니다.
 
 ## 층별 대형 모니터 현황판 (Floor Monitor Mode)
@@ -139,17 +139,17 @@ React 18 · TypeScript(strict) · Vite · Tailwind CSS · Zustand · React Route
 
 ```
 src/
-├── types/index.ts          프론트 UI/domain 타입
+├── types/                  index.ts의 공통 타입 + 도메인별 UI/domain 모델
 ├── lib/                    utils · labels · roles · format
 ├── services/               API/서비스 레이어
 │   ├── apiClient.ts        fetch 래퍼 (`/api/v1`, cookie credentials, X-Facility-Id)
-│   ├── api/                백엔드 endpoint mapper
+│   ├── api/                백엔드 endpoint mapper + <domain>/dto/의 wire DTO
 │   ├── authService.ts      로그인/세션 복원
 │   ├── dashboardService.ts 대시보드/공간 상태
 │   └── eventService.ts     이벤트 확인/조치
 ├── stores/                 authStore · facilityStore · monitorStore 등
 ├── components/             layout, status board, ui primitives ...
-├── features/               dashboard · monitor · admin-events (barrel `index.ts`)
+├── features/               dashboard · monitor · admin-events · edge-enrollment (barrel `index.ts`)
 ├── pages/                  Login, admin pages, ...
 └── router.tsx              facility-scoped canonical routes + legacy redirects
 ```
@@ -158,7 +158,7 @@ src/
 
 ### 데이터 모델
 
-프론트 타입은 `src/types/index.ts`의 UI/domain view입니다. 영속 모델과 HTTP 표면은 백엔드(Prisma + controllers + OpenAPI)가 소유합니다. `SpaceStatus`, `DetectionEvent`, `AlertRule`, `ResidentRiskSummary`, `VideoClip` 등 일부 프론트 타입은 화면 호환용일 수 있으며, 동명 CRUD route가 있다는 뜻이 아닙니다. 계약이 불명확하면 `CONTRACT.md`와 백엔드 OpenAPI를 보세요.
+프론트 UI/domain 모델은 `src/types/`에 두며, 공통 타입은 `index.ts`, 도메인별 모델은 별도 모듈이 소유합니다. Raw wire DTO는 `src/services/api/<domain>/dto/`에 둡니다. 영속 모델과 HTTP 표면은 백엔드(Prisma + controllers + OpenAPI)가 소유합니다. `SpaceStatus`, `DetectionEvent`, `AlertRule`, `ResidentRiskSummary`, `VideoClip` 등 일부 프론트 타입은 화면 호환용일 수 있으며, 동명 CRUD route가 있다는 뜻이 아닙니다. 계약이 불명확하면 `CONTRACT.md`와 백엔드 OpenAPI를 보세요.
 
 ## 백엔드 연동 계약 (요약)
 

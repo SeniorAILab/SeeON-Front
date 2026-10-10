@@ -1,13 +1,20 @@
 import type { AlertView } from "@/types";
 import { ackAlertEndpoint, listAlertsEndpoint, resolveAlertEndpoint } from "./api/alertEndpoints";
 import {
+  buildAlertMediaContentPath,
   getAlertMediaEndpoint,
   recordAlertMediaAccessEndpoint,
-  type AlertMediaAccessRequest,
-  type AlertMediaMetadata,
 } from "./api/alertMedia";
+import type { AlertMediaAccessRequest, AlertMediaMetadata } from "@/types/alertMedia";
+import {
+  canDownloadAlertAttachment,
+  downloadAlertMediaAttachment,
+} from "./api/alertMediaDownloads";
 
 export const alertService = {
+  buildMediaContentPath: buildAlertMediaContentPath,
+  canDownloadAttachment: canDownloadAlertAttachment,
+  downloadAttachment: downloadAlertMediaAttachment,
   listOpen(): Promise<AlertView[]> {
     return listAlertsEndpoint({ status: "NEW" });
   },
@@ -44,4 +51,13 @@ export const alertService = {
   },
 };
 
-export type { AlertMediaAccessRequest, AlertMediaMetadata } from "./api/alertMedia";
+export type {
+  AlertMediaAccessAction,
+  AlertMediaAccessRequest,
+  AlertMediaMetadata,
+  ReadyAlertMediaClip,
+} from "@/types/alertMedia";
+export {
+  AlertMediaDownloadError,
+  type AlertMediaDownloadErrorCode,
+} from "@/lib/alertMediaErrors";

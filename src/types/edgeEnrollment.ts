@@ -1,3 +1,5 @@
+import type { OneTimeCredential } from "@/lib/edgeCredential";
+
 export const EDGE_CREDENTIAL_LIFECYCLES = [
   "ACTIVE",
   "GRACE",
@@ -7,6 +9,28 @@ export const EDGE_CREDENTIAL_LIFECYCLES = [
 
 export type EdgeCredentialLifecycle =
   (typeof EDGE_CREDENTIAL_LIFECYCLES)[number];
+
+export type IssueEdgeCredentialRequest = {
+  readonly facilityId: string;
+  readonly idempotencyKey: string;
+  readonly signal?: AbortSignal;
+};
+
+export type ListEdgeCredentialsRequest = {
+  readonly facilityId?: string;
+  readonly lifecycle?: EdgeCredentialLifecycle;
+  readonly signal?: AbortSignal;
+};
+
+export type CredentialMutationRequest = {
+  readonly tokenId: string;
+  readonly idempotencyKey: string;
+  readonly signal?: AbortSignal;
+};
+
+export type RevokeEdgeCredentialRequest = CredentialMutationRequest & {
+  readonly expectedLifecycle: "ACTIVE" | "GRACE";
+};
 
 export type RedactedEdgeCredential = {
   readonly tokenId: string;
@@ -127,37 +151,3 @@ export type TopologyPreviewStatus =
       readonly roomCount: number;
       readonly cameraCount: number;
     };
-
-export class OneTimeCredential {
-  #value: string | null;
-
-  constructor(value: string) {
-    this.#value = value;
-  }
-
-  consume(): string | null {
-    const value = this.#value;
-    this.clear();
-    return value;
-  }
-
-  clear(): void {
-    this.#value = null;
-  }
-
-  dispose(): void {
-    this.clear();
-  }
-
-  toJSON(): null {
-    return null;
-  }
-}
-
-export class EdgeEnrollmentResponseError extends Error {
-  readonly name = "EdgeEnrollmentResponseError";
-
-  constructor(readonly reason: string) {
-    super(`Malformed edge enrollment response: ${reason}`);
-  }
-}

@@ -1,14 +1,14 @@
 import { useState } from "react";
 import { ArrowRightLeft, RefreshCw } from "lucide-react";
 
-import { Button, Card, Field, Input, Textarea } from "@/components/ui/primitives";
+import { Button, Card, Field, Input, Textarea } from "@/components/ui/Primitives";
 import {
   replaceEdgeInstallation,
   transferEdgeOwnership,
   type OneTimeCredential,
 } from "@/services/edgeAdminService";
 import { ConfirmActionDialog } from "./ConfirmActionDialog";
-import { createIdempotencyKey, parseOwnershipManifest } from "./edgeAdminUi";
+import { createIdempotencyKey, parseOwnershipManifest } from "../lib/edgeAdminUi";
 
 type InstallationLifecyclePanelProps = {
   readonly edgeInstallationId: string;

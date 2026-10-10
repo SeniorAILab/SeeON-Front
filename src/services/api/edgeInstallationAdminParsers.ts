@@ -2,9 +2,9 @@ import type {
   EdgeOperationSummary,
   OperationStatus,
   OwnershipTransferKind,
-} from "./edgeEnrollmentTypes";
-import { EdgeEnrollmentResponseError } from "./edgeEnrollmentTypes";
-import type { EdgeOwnershipTransfer } from "./edgeInstallationAdminTypes";
+} from "@/types/edgeEnrollment";
+import { EdgeEnrollmentResponseError } from "@/lib/edgeCredential";
+import type { EdgeOwnershipTransfer } from "@/types/edgeInstallationAdmin";
 import {
   readInstant,
   readNonnegativeInteger,

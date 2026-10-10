@@ -1,29 +1,15 @@
 import { requestJson } from "@/services/apiClient";
 import { parseReplaceEdgeInstallation } from "./edgeEnrollmentCredentialParsers";
 import { parseEdgeOwnershipTransfer } from "./edgeInstallationAdminParsers";
+import type { ReplaceEdgeInstallationRequestDto } from "./edge-installations/dto/replace-edge-installation-request.dto";
+import type { TransferEdgeOwnershipRequestDto } from "./edge-installations/dto/transfer-edge-ownership-request.dto";
 import type {
   EdgeOwnershipTransfer,
-  OwnershipTransferManifestItem,
+  InstallationMutationRequest,
+  ReplaceEdgeInstallationRequest,
   ReplacedEdgeInstallation,
-} from "./edgeInstallationAdminTypes";
-
-type InstallationMutationRequest = {
-  readonly edgeInstallationId: string;
-  readonly idempotencyKey: string;
-  readonly signal?: AbortSignal;
-};
-
-export type ReplaceEdgeInstallationRequest = InstallationMutationRequest & {
-  readonly expectedEnrollmentGeneration: number;
-  readonly newClientInstallationRef: string;
-};
-
-export type TransferEdgeOwnershipRequest = InstallationMutationRequest & {
-  readonly expectedEnrollmentGeneration: number;
-  readonly expectedServerRevision: number;
-  readonly manifestDigest: string;
-  readonly manifest: readonly OwnershipTransferManifestItem[];
-};
+  TransferEdgeOwnershipRequest,
+} from "@/types/edgeInstallationAdmin";
 
 export async function replaceEdgeInstallation(
   request: ReplaceEdgeInstallationRequest,
@@ -35,7 +21,7 @@ export async function replaceEdgeInstallation(
         schemaVersion: 1,
         expectedEnrollmentGeneration: request.expectedEnrollmentGeneration,
         newClientInstallationRef: request.newClientInstallationRef,
-      }),
+      } satisfies ReplaceEdgeInstallationRequestDto),
     ),
   );
 }
@@ -52,14 +38,14 @@ export async function transferEdgeOwnership(
         expectedServerRevision: request.expectedServerRevision,
         manifestDigest: request.manifestDigest,
         manifest: request.manifest,
-      }),
+      } satisfies TransferEdgeOwnershipRequestDto),
     ),
   );
 }
 
 function mutationOptions(
   request: InstallationMutationRequest,
-  body: object,
+  body: ReplaceEdgeInstallationRequestDto | TransferEdgeOwnershipRequestDto,
 ): RequestInit {
   const options: RequestInit = {
     method: "POST",

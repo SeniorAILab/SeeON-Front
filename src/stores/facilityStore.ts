@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { Facility, User } from "@/types";
+import type { FacilitySummary, User } from "@/types";
 
 const STORAGE_KEY = "eldercare.currentFacilityId";
 
@@ -28,11 +28,11 @@ function persistFacilityId(id: string | null): void {
 
 interface FacilityState {
   currentFacilityId: string | null;
-  facilities: Facility[];
+  facilities: FacilitySummary[];
   setFacility: (id: string) => void;
   clearFacility: () => void;
   switchFacility: (id: string | null) => void;
-  setFacilities: (facilities: readonly Facility[]) => void;
+  setFacilities: (facilities: readonly FacilitySummary[]) => void;
   resolveForUser: (userFacilityId: string | null) => string | null;
   hydrateForUser: (user: User | null) => string | null;
 }
@@ -79,8 +79,8 @@ export function getCurrentFacilityId(): string | null {
 
 export function facilitiesForUser(
   userFacilityId: string | null,
-  facilities: readonly Facility[],
-): Facility[] {
+  facilities: readonly FacilitySummary[],
+): FacilitySummary[] {
   if (userFacilityId === null) return [...facilities];
   return facilities.filter((facility) => facility.id === userFacilityId);
 }

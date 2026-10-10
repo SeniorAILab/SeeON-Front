@@ -1,9 +1,6 @@
 import { ApiError } from "@/services/apiClient";
-import {
-  AlertMediaResponseError,
-  type AlertMediaMetadata,
-  type ReadyAlertMediaClip,
-} from "./api/alertMedia";
+import { AlertMediaResponseError } from "@/lib/alertMediaErrors";
+import type { AlertMediaMetadata, ReadyAlertMediaClip } from "@/types/alertMedia";
 
 /**
  * 백엔드가 "근거 영상 기능이 꺼져 있음"을 알릴 때 쓰는 코드.

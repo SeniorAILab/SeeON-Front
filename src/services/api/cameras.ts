@@ -1,19 +1,13 @@
 import { requestJson } from "@/services/apiClient";
 import { STALE_CUTOFF_MS, type CameraConnection } from "@/types";
-
-export interface CameraStatus {
-  id: string;
-  facilityId: string;
-  spaceId: string;
-  online: boolean;
-  lastSeenAt: string | null;
-}
+import type { CameraStatus, SpaceFreshness } from "@/types/camera";
+import type { CameraResponseDto } from "./cameras/dto/camera-response.dto";
 
 function mapCamera(value: unknown): CameraStatus {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     throw new Error("Invalid cameras response");
   }
-  const dto = value as Record<string, unknown>;
+  const dto = value as Record<keyof CameraResponseDto, unknown>;
   if (
     typeof dto.id !== "string" ||
     typeof dto.facilityId !== "string" ||
@@ -29,7 +23,7 @@ function mapCamera(value: unknown): CameraStatus {
     spaceId: dto.spaceId,
     online: dto.online,
     lastSeenAt: dto.lastSeenAt,
-  };
+  } satisfies CameraResponseDto;
 }
 
 export async function listCameras(): Promise<CameraStatus[]> {
@@ -56,11 +50,6 @@ export function resolveCameraConnection(
   const seen = Date.parse(lastSeenAt);
   if (Number.isNaN(seen)) return "STALE";
   return now - seen <= STALE_CUTOFF_MS ? "LIVE" : "STALE";
-}
-
-export interface SpaceFreshness {
-  connection: CameraConnection;
-  lastSeenAt: string | null;
 }
 
 /**

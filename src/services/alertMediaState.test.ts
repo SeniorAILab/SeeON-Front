@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { ApiError } from "@/services/apiClient";
-import type { AlertMediaMetadata } from "./api/alertMedia";
+import type { AlertMediaMetadata } from "@/types/alertMedia";
 import {
   createAlertMediaCoordinator,
   createAlertMediaRequestKey,

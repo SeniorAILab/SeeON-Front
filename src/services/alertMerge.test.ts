@@ -15,8 +15,7 @@ import {
   mergeAlertUpdatesIntoDashboard,
 } from "./alertMerge";
 import type { AlertUpdateDelta } from "./alertMerge";
-import type { FrontendAlert } from "./api/alertEndpoints";
-import type { DashboardResponse, SpaceStatus } from "@/types";
+import type { DashboardResponse, FrontendAlert, SpaceStatus } from "@/types";
 const SCOPED_FACILITY_ID = "fac_happy_nokyang";
 
 function alert(overrides: Partial<FrontendAlert> = {}): FrontendAlert {

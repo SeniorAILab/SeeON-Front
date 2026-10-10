@@ -8,8 +8,8 @@ import {
   acknowledgeAlert,
   resolveAlert,
   resolveAlertEndpoint,
-  type AlertDto,
 } from "./alertEndpoints";
+import type { AlertDto } from "./alerts/dto/alert-response.dto";
 import { requestJson } from "@/services/apiClient";
 const SCOPED_FACILITY_ID = "fac_happy_nokyang";
 

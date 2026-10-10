@@ -8,7 +8,7 @@ import {
   type AlertMediaPanelState,
   type AlertMediaRequestIdentity,
 } from "@/services/alertMediaState";
-import type { AlertMediaAccessAction } from "@/services/api/alertMedia";
+import type { AlertMediaAccessAction } from "@/services/alertService";
 import { AlertEvidencePlayer } from "./AlertEvidencePlayer";
 import { AlertEvidenceState } from "./AlertEvidenceState";
 import { AlertMediaDownloadButton } from "./AlertMediaDownloadButton";

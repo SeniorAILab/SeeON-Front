@@ -5,7 +5,7 @@ import {
   replaceEdgeInstallation,
   transferEdgeOwnership,
 } from "@/services/api/edgeInstallationAdmin";
-import { OneTimeCredential } from "@/services/api/edgeEnrollmentTypes";
+import { OneTimeCredential } from "@/lib/edgeCredential";
 import { InstallationLifecyclePanel } from "./InstallationLifecyclePanel";
 
 vi.mock("@/services/api/edgeInstallationAdmin", () => ({

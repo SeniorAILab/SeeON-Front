@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { Check, Pencil, Plus, Trash2, X } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
-import { Card, Button, Field, Input, Select } from "@/components/ui/primitives";
-import { createFloor, deleteFloor, listFloors, updateFloor } from "@/services/api/floors";
-import { createSpace, deleteSpace, listSpaces, updateSpace } from "@/services/api/spaces";
+import { Card, Button, Field, Input, Select } from "@/components/ui/Primitives";
+import { floorService } from "@/services/floorService";
+import { spaceService } from "@/services/spaceService";
 import { apiErrorMessage } from "@/services/apiClient";
 import type { Floor, Space } from "@/types";
 
@@ -28,7 +28,7 @@ export function AdminSpacesPage() {
   const [notice, setNotice] = useState<string | null>(null);
 
   async function load() {
-    const [nextFloors, nextSpaces] = await Promise.all([listFloors(), listSpaces()]);
+    const [nextFloors, nextSpaces] = await Promise.all([floorService.listFloors(), spaceService.listSpaces()]);
     setFloors(nextFloors);
     setSpaces(nextSpaces);
   }
@@ -48,7 +48,7 @@ export function AdminSpacesPage() {
     setError(null);
     setNotice(null);
     try {
-      await createFloor({ name });
+      await floorService.createFloor({ name });
       setNewFloorName("");
       await load();
     } catch (e) {
@@ -62,7 +62,7 @@ export function AdminSpacesPage() {
     setError(null);
     setNotice(null);
     try {
-      await updateFloor(id, { name });
+      await floorService.updateFloor(id, { name });
       setEditingFloorId(null);
       await load();
     } catch (e) {
@@ -74,7 +74,7 @@ export function AdminSpacesPage() {
     setError(null);
     setNotice(null);
     try {
-      await deleteFloor(id);
+      await floorService.deleteFloor(id);
       await load();
       setNotice("층을 삭제했습니다.");
     } catch (e) {
@@ -98,9 +98,9 @@ export function AdminSpacesPage() {
     };
     try {
       if (spaceDraft.id) {
-        await updateSpace(spaceDraft.id, input);
+        await spaceService.updateSpace(spaceDraft.id, input);
       } else {
-        await createSpace({ ...input, type: "ROOM", capacity: 1 });
+        await spaceService.createSpace({ ...input, type: "ROOM", capacity: 1 });
       }
       setSpaceDraft(null);
       await load();
@@ -113,7 +113,7 @@ export function AdminSpacesPage() {
     setError(null);
     setNotice(null);
     try {
-      await deleteSpace(space.id);
+      await spaceService.deleteSpace(space.id);
       setSpaces((current) =>
         current.map((item) => (item.id === space.id ? { ...item, isActive: false } : item))
       );
@@ -127,7 +127,7 @@ export function AdminSpacesPage() {
     setError(null);
     setNotice(null);
     try {
-      await updateSpace(space.id, { isActive: true });
+      await spaceService.updateSpace(space.id, { isActive: true });
       setSpaces((current) =>
         current.map((item) => (item.id === space.id ? { ...item, isActive: true } : item))
       );

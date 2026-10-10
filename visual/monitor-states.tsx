@@ -17,7 +17,7 @@ import { FloorMonitorPage } from "@/features/monitor/pages/FloorMonitorPage";
 import { useAuthStore } from "@/stores/authStore";
 import { useFacilityStore } from "@/stores/facilityStore";
 import { useMonitorSettingsStore } from "@/features/monitor/stores/monitorSettingsStore";
-import { type DetectionEvent, type Floor, type Space, type SpaceStatus } from "@/types";
+import { type DetectionEvent, type Floor, type Space, type DashboardSpace, type SpaceStatus } from "@/types";
 import "@/index.css";
 
 const MODE = new URLSearchParams(location.search).get("mode") ?? "mixed";
@@ -216,7 +216,7 @@ const statuses: Record<string, SpaceStatus> =
 // Hooks 규칙을 지키기 위해 useState는 분기 이전에 무조건 호출한다.
 function Harness() {
   const rootRef = useRef<HTMLDivElement>(null);
-  const [selected, setSelected] = useState<Space | null>(null);
+  const [selected, setSelected] = useState<DashboardSpace | null>(null);
 
   if (MODE === "overview-flow") {
     const danger = 0;

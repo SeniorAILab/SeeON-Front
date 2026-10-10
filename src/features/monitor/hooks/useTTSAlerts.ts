@@ -7,11 +7,11 @@ import {
   type TTSAlertInput,
 } from "@/features/monitor/services/tts/ttsManager";
 import type { TTSFailureReason } from "@/features/monitor/services/tts/ttsProvider";
-import type { DetectionEvent, Floor, Space, SpaceStatus } from "@/types";
+import type { DetectionEvent, Floor, DashboardSpace, SpaceStatus } from "@/types";
 
 /** Alert identity is the queue key; space state is only a fallback when no alert DTO exists. */
 export function buildTTSAlerts(
-  spaces: Space[],
+  spaces: DashboardSpace[],
   statuses: Record<string, SpaceStatus>,
   floors: Floor[],
   alerts: DetectionEvent[] = [],

@@ -1,9 +1,8 @@
 import { mkdirSync } from "node:fs";
-import { fileURLToPath } from "node:url";
 import { defineConfig, devices } from "@playwright/test";
+import { getEdgeProvisioningEvidenceDirectory } from "./e2e/evidence-directory";
 
-const evidenceDirectory = process.env.EDGE_PROVISIONING_EVIDENCE_DIR
-  ?? fileURLToPath(new URL("../../../.omo/evidence/edge-driven-facility-provisioning/task-13/", import.meta.url));
+const evidenceDirectory = getEdgeProvisioningEvidenceDirectory();
 const baseURL = process.env.EDGE_PROVISIONING_BASE_URL ?? "http://127.0.0.1:3000";
 const target = new URL(baseURL);
 

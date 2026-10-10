@@ -1,10 +1,9 @@
 import { createConnection } from "node:net";
-import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
 import { SECRET_SOCKET_ENV } from "./secret-fd-bridge";
+import { getEdgeProvisioningEvidenceDirectory } from "./evidence-directory";
 
-const evidenceDirectory = process.env.EDGE_PROVISIONING_EVIDENCE_DIR
-  ?? fileURLToPath(new URL("../../../../.omo/evidence/edge-driven-facility-provisioning/task-13/", import.meta.url));
+const evidenceDirectory = getEdgeProvisioningEvidenceDirectory();
 
 test("super admin issues one-time enrollment and leaves only a redacted screenshot", async ({ context, page }) => {
   const email = requiredEnvironment("EDGE_PROVISIONING_ADMIN_EMAIL");

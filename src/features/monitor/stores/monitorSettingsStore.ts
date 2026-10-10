@@ -9,19 +9,34 @@ const DEFAULTS: MonitorSettings = {
   // 소리 알림의 SSOT. TV에 상시 띄워둔 화면에서 요양보호사가 낙상 알림을
   // 소리로 받는 것이 기본 운영 형태이므로 켜짐으로 시작한다.
   alertSound: true,
-  nightMode: false,
   cardSize: "lg", // 14공간 화면 기준 기본 크기
   visibleSpaceIds: null,
   allowAllView: true,
 };
 
+function persistedSettings(value: MonitorSettings): MonitorSettings {
+  return {
+    defaultFloorId: value.defaultFloorId,
+    refreshMs: value.refreshMs,
+    alertSound: value.alertSound,
+    cardSize: value.cardSize,
+    visibleSpaceIds: value.visibleSpaceIds,
+    allowAllView: value.allowAllView,
+  };
+}
+
 function load(): MonitorSettings {
   try {
     const raw = localStorage.getItem(KEY);
     if (raw) {
-      const settings = { ...DEFAULTS, ...JSON.parse(raw) };
+      const parsed = JSON.parse(raw) as Record<string, unknown>;
+      const { nightMode: _ignoredLegacyTheme, ...rest } = parsed;
+      const settings = persistedSettings({
+        ...DEFAULTS,
+        ...(rest as Partial<MonitorSettings>),
+      });
       if (!settings.allowAllView && settings.defaultFloorId === "all") {
-        settings.defaultFloorId = DEFAULTS.defaultFloorId;
+        return { ...settings, defaultFloorId: DEFAULTS.defaultFloorId };
       }
       return settings;
     }
@@ -39,12 +54,12 @@ interface SettingsState extends MonitorSettings {
 export const useMonitorSettingsStore = create<SettingsState>((set, get) => ({
   ...load(),
   update: (patch) => {
-    const next = { ...get(), ...patch };
-    if (!next.allowAllView && next.defaultFloorId === "all") {
-      next.defaultFloorId = DEFAULTS.defaultFloorId;
-    }
-    const { update: _u, reset: _r, ...data } = next;
-    localStorage.setItem(KEY, JSON.stringify(data));
+    const merged = persistedSettings({ ...get(), ...patch });
+    const next =
+      !merged.allowAllView && merged.defaultFloorId === "all"
+        ? { ...merged, defaultFloorId: DEFAULTS.defaultFloorId }
+        : merged;
+    localStorage.setItem(KEY, JSON.stringify(next));
     set(next);
   },
   reset: () => {

@@ -23,7 +23,6 @@ export function FloorMonitorPage({ allView = false }: { allView?: boolean }) {
   const currentFacilityId = useFacilityStore((s) => s.currentFacilityId);
   const facilityId = user?.role === "SUPER_ADMIN" ? currentFacilityId : user?.facilityId;
 
-  const nightMode = useMonitorSettingsStore((s) => s.nightMode);
   const visibleSpaceIds = useMonitorSettingsStore((s) => s.visibleSpaceIds);
   const alertSound = useMonitorSettingsStore((s) => s.alertSound);
   const cardSize = useMonitorSettingsStore((s) => s.cardSize);
@@ -173,7 +172,7 @@ export function FloorMonitorPage({ allView = false }: { allView?: boolean }) {
     <div
       ref={rootRef}
       data-testid="monitor-root"
-      className={["page-bleed", nightMode ? "dark" : "", allView ? "" : "h-full"].filter(Boolean).join(" ")}
+      className={["page-bleed", allView ? "" : "h-full"].filter(Boolean).join(" ")}
     >
       <div
         data-testid="monitor-surface"

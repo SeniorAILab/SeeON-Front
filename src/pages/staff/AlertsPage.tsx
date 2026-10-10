@@ -19,7 +19,6 @@ export function AlertsPage() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-
   // 방금 도착한 고위험 알림에만 pulse를 준다. 첫 로드는 화면을 처음 여는
   // 순간이라 "새로 도착"이 아니므로 조용히 seed만 하고 pulse를 걸지 않는다.
   const seenIdsRef = useRef<Set<string> | null>(null);
@@ -61,24 +60,16 @@ export function AlertsPage() {
 
   const grouped = useMemo(
     () => ({
-      NEW: alerts.filter((alert) => alert.status === "NEW"),
-      ACKED: alerts.filter((alert) => alert.status === "ACKED"),
+      OUTSTANDING: alerts.filter((alert) => alert.status === "NEW" || alert.status === "ACKED"),
       RESOLVED: alerts.filter((alert) => alert.status === "RESOLVED"),
     }),
     [alerts]
   );
 
-  /** NEW → ACKED. 확인만 하고 아직 해결하지 않는다. */
-  async function acknowledge(alert: AlertView) {
-    await runAction(alert.id, () => alertService.acknowledge(alert.id));
-  }
-
-  /** ACKED → RESOLVED. 조치 기록 유무와 무관하게 처리된다 — 텍스트 입력 없이 버튼 하나로 끝난다. */
+  /** 확인 한 번으로 NEW와 기존 ACKED 알림을 모두 처리 완료한다. */
   async function resolve(alert: AlertView) {
     await runAction(alert.id, () => alertService.resolve(alert.id));
   }
-
-
 
   async function runAction(id: string, action: () => Promise<AlertView>) {
     if (busyId) return;
@@ -93,7 +84,6 @@ export function AlertsPage() {
       setBusyId(null);
     }
   }
-
 
   return (
     <div className="space-y-5">
@@ -112,41 +102,24 @@ export function AlertsPage() {
           <AlertSection
             title="확인 필요"
             empty="확인할 새 알림이 없습니다."
-            alerts={grouped.NEW}
+            alerts={grouped.OUTSTANDING}
             renderMeta={(alert) => `${formatDateTime(alert.detectedAt)} · ${alert.room ?? "공간"}`}
             pulseClassFor={(alert) => (pulsingIds.has(alert.id) ? "animate-pulse-alert-new motion-reduce:animate-none" : "")}
             renderAction={(alert) => (
               <button
                 disabled={busyId !== null}
-                onClick={() => acknowledge(alert)}
+
+                onClick={() => resolve(alert)}
                 className="min-h-[56px] rounded-xl bg-brand px-6 text-staff-btn text-white disabled:opacity-60"
               >
-                확인하러 갑니다
+                확인
               </button>
             )}
           />
 
           <AlertSection
-            title="확인됨"
-            empty="확인된 알림이 없습니다."
-            alerts={grouped.ACKED}
-            renderMeta={(alert) =>
-              `${alert.ackedByName ?? "직원"} 확인 · ${formatDateTime(alert.ackedAt ?? alert.detectedAt)} · ${alert.room}`
-            }
-            renderAction={(alert) => (
-              <button
-                disabled={busyId !== null}
-                onClick={() => resolve(alert)}
-                className="min-h-[56px] rounded-xl bg-status-stable px-6 text-staff-btn text-white disabled:opacity-60"
-              >
-                현장 확인 완료
-              </button>
-            )}
-          />
-
-          <AlertSection
-            title="해결됨"
-            empty="해결된 알림이 없습니다."
+            title="처리됨"
+            empty="처리된 알림이 없습니다."
             alerts={grouped.RESOLVED}
             renderMeta={(alert) =>
               `${alert.resolvedByName ?? "직원"} 해결 · ${formatDateTime(

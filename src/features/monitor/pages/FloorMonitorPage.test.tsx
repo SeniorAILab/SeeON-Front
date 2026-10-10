@@ -68,7 +68,6 @@ describe("FloorMonitorPage", () => {
       defaultFloorId: "fl_2f",
       refreshMs: 6000,
       alertSound: false,
-      nightMode: false,
       cardSize: "xl",
       visibleSpaceIds: null,
       allowAllView: true,
@@ -163,7 +162,6 @@ describe("FloorMonitorPage — allView-keyed surface sizing", () => {
       defaultFloorId: "fl_2f",
       refreshMs: 6000,
       alertSound: false,
-      nightMode: false,
       cardSize: "xl",
       visibleSpaceIds: null,
       allowAllView: true,
@@ -234,7 +232,7 @@ describe("FloorMonitorPage — allView-keyed surface sizing", () => {
     expect(surface.className).not.toContain("page-bleed");
   });
 
-  it("toggles the dark-mode wrapper class with the nightMode setting", async () => {
+  it("does not apply a local dark wrapper; appearance stays on html.dark", async () => {
     render(<FloorMonitorPage />);
 
     const surface = await screen.findByTestId("monitor-surface");
@@ -243,15 +241,6 @@ describe("FloorMonitorPage — allView-keyed surface sizing", () => {
     expect(root?.className).not.toContain("dark");
     expect(root?.className).toContain("page-bleed");
     expect(root?.className).toContain("h-full");
-
-    act(() => {
-      useMonitorSettingsStore.getState().update({ nightMode: true });
-    });
-
-    await waitFor(() => expect(root?.className).toContain("dark"));
-    expect(root?.className).toContain("page-bleed");
-    expect(root?.className).toContain("h-full");
-    expect(surface.className).toContain("overflow-hidden");
   });
 
   it("passes the compact header contract only to the per-floor focus surface", async () => {
@@ -334,7 +323,6 @@ describe("FloorMonitorPage — initial-load-error", () => {
       defaultFloorId: "fl_2f",
       refreshMs: 6000,
       alertSound: false,
-      nightMode: false,
       cardSize: "xl",
       allowAllView: true,
       visibleSpaceIds: null,

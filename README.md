@@ -8,41 +8,55 @@
 
 <p align="center">
   <strong>돌봄 현장에서, 지금 확인할 곳을 선명하게.</strong><br />
-  방과 공간의 상태를 한눈에 보는 케어 모니터링 대시보드.
+  시설의 방·공간 상태와 알림을 직원과 관리자에게 전달하는 웹 대시보드.
 </p>
 
 <p align="center">
   <a href="#빠른-시작">빠른 시작</a> ·
-  <a href="#화면과-역할">화면과 역할</a> ·
-  <a href="#아키텍처">아키텍처</a> ·
-  <a href="#문서-지도">문서</a>
+  <a href="#화면과-기능">화면과 기능</a> ·
+  <a href="./docs/architecture.md">아키텍처</a> ·
+  <a href="#운영과-보안-경계">운영과 보안</a> ·
+  <a href="#문서">문서</a>
 </p>
 
-CCTV 원본 스트림 대신 AI 분석 결과를 방·공간 단위 카드로 보여준다. 직원은 확인이 필요한 공간과 알림에 집중하고, 관리자는 권한에 맞는 상세 정보와 근거 영상을 확인한다.
+SeeON Front는 AI 분석 결과와 시설 데이터를 현장 친화적인 카드·알림으로 보여주는 **Vite + React SPA**입니다. 이 저장소는 브라우저 UI와 백엔드 API 연결을 담당하며, 영상 분석·데이터 저장·최종 권한 판정은 담당하지 않습니다.
 
-| 현장 직원 | 층별 모니터 | 관리자 |
-| :--- | :--- | :--- |
-| 큰 글자와 버튼, 익숙한 한글 안내, 위험 우선 카드 | 큰 화면에 맞는 공간 현황과 실시간 갱신, 음성 안내 | 시설·공간·사용자 설정, 이벤트 상세, 허용된 근거 영상 |
-
-React 18 · TypeScript · Vite · Tailwind CSS · Zustand
-
-## 현재 readiness
-
-| Label | 이 저장소 상태 |
+| 사용자 | 화면 |
 | --- | --- |
-| `STATIC_READY` | 목표: 루트에서 설치·빌드·정적 배포(SPA shell + deep route refresh) |
-| Full product readiness | **아직 주장하지 않음**. HTTPS API, CORS/쿠키, 로그인, SSE, upload, media Range, RBAC가 실제 Production URL에서 통과하기 전까지 금지. 문서/배포만으로 이 단계를 선언하지 마세요. |
+| `STAFF` | 시설 대시보드, 층별 모니터, 알림 처리 |
+| `ADMIN` | 이벤트 상세, 시설·공간·사용자 및 모니터·알림 설정 |
+| `SUPER_ADMIN` | 시설 선택과 엣지 등록 관리 등 상위 운영 화면 |
 
-Vercel 정적 배포만으로 로그인·실시간·미디어의 동작을 보장하지 않는다. 레거시 origin과 전환 이력은 [MIGRATION.md](./MIGRATION.md)를 참고한다. HTTPS 페이지에서 HTTP origin을 API로 사용하지 않는다.
+## 배포 범위
+
+[`vercel.json`](./vercel.json)은 Vite 빌드 산출물 `dist`와 SPA 경로 재작성 규칙을 정의합니다. 이는 정적 프런트엔드 호스팅 구성이지, API 연결이나 배포 성공을 증명하지 않습니다. 이 저장소는 Vercel 정적 배포만으로 **전체 제품 준비 상태**를 주장하지 않습니다.
+
+독립 프런트 저장소에는 실행 중인 백엔드나 Docker/nginx API 프록시가 포함되어 있지 않습니다. 이전 추출·전환과 제거된 런타임 파일의 이력은 [MIGRATION.md](./MIGRATION.md)를 참고하세요.
+
+실제 Production URL에서 HTTPS API, CORS와 쿠키, 로그인, SSE, 업로드, 미디어 Range 요청, RBAC를 검증하기 전에는 `STATIC_READY`를 넘어선 제품 준비 상태를 선언하지 마세요. 기준과 전환 이력은 [MIGRATION.md](./MIGRATION.md)에서 확인합니다. Vercel 재작성은 API 프록시가 아닙니다.
 
 ## 빠른 시작
 
-저장소 **루트**에서 실행합니다. 부모 monorepo workspace filter는 필요 없습니다.
+프런트엔드 저장소 루트에서 실행합니다. 다음 도구 버전은 [`package.json`](./package.json), [`.nvmrc`](./.nvmrc), CI 설정을 따릅니다.
+
+- Node.js `24.x`
+- Corepack으로 활성화한 `pnpm@10.32.1`
+- 별도 실행 중인 SeeON 백엔드 API. 개발 서버의 기본 `/api` 프록시 대상은 `http://localhost:8080`입니다.
 
 ```bash
-# Node 24.x · pnpm@10.32.1 (package.json 기준)
-pnpm install
-pnpm dev          # http://localhost:3000
+corepack enable
+corepack prepare pnpm@10.32.1 --activate
+pnpm install --frozen-lockfile
+pnpm dev
+```
+
+Vite 개발 서버는 `http://localhost:3000`에서 실행됩니다. 로컬 API가 다른 주소에 있다면 `.env.example`을 `.env.local`로 복사하고 `VITE_DEV_BACKEND_ORIGIN`을 해당 로컬 API 주소로 조정하세요. 기본 API 경로는 `/api/v1`입니다. `.env.local`에 비밀값이나 운영 자격 증명을 넣거나 커밋하지 마세요. 백엔드 실행 방법과 계정은 [SeeON-Backend 저장소](https://github.com/SeniorAILab/SeeON-Backend)의 안내를 따릅니다.
+
+백엔드가 연결되지 않아도 프런트 개발 서버는 뜰 수 있지만, 로그인과 API 데이터는 사용할 수 없습니다. 런타임 mock 계정이나 샘플 성공 경로는 없습니다.
+
+저장소에 정의된 주요 확인·빌드 명령:
+
+```bash
 pnpm typecheck
 pnpm lint
 pnpm test
@@ -50,175 +64,59 @@ pnpm build
 pnpm preview
 ```
 
-로컬 API 연동은 dev 서버가 `/api`를 백엔드 origin으로 proxy합니다(환경 계약은 env lane 문서·`.env.example` 기준). 백엔드가 없으면 정적 shell과 UI는 뜨지만 인증·데이터 호출은 기존 오류 UI로 실패하는 것이 정상입니다. mock으로 초록불을 만들지 마세요.
+실행 명령은 [`package.json`](./package.json)에 정의되어 있으며, GitHub Actions는 고정 lockfile 설치 후 `typecheck`, `lint`, `test`를 실행합니다([CI workflow](./.github/workflows/ci.yml)). 이 문서는 위 명령을 이번 문서 작업에서 실행했다는 뜻이 아닙니다.
 
-### 로그인
+## 화면과 기능
 
-dev/prod 로그인은 백엔드가 소유합니다. 이메일/비밀번호는 `POST /api/v1/auth/login`으로
-처리하며, 백엔드가 httpOnly `app_session` JWT 쿠키를 만든 뒤 프론트가 `GET /api/v1/auth/me`로
-복원합니다. 처음 로그인한 계정이 아직 시설에 연결되지 않았다면 `/onboarding`에서
-`POST /api/v1/facilities`로 시설을 등록합니다.
+### 직원 화면
 
-로컬 seed 계정은 `super@sen.ai`, `admin@sen.ai`, `staff@sen.ai`이며 비밀번호는
-백엔드 seed 환경변수에서 옵니다. 운영 seed에는 조용한 기본 비밀번호가 없습니다. 비밀번호를 이 저장소에 적지 마세요.
+시설 스코프를 갖는 주요 경로는 다음과 같습니다.
 
-## 화면과 역할
+- `/facilities/:facilityId/dashboard` — 전체 공간 모니터
+- `/facilities/:facilityId/floors` — 층 선택
+- `/facilities/:facilityId/floor/:floorId` — 특정 층 모니터
+- `/facilities/:facilityId/alerts` — 알림 목록과 처리
 
-요양보호사·간호조무사·사회복지사·야간 근무자가 **빠르게 위험을 이해하고 다음 행동을 고를 수 있도록** 큰 글자와 버튼, 현장 중심 문구를 사용한다.
+직원 화면은 공간 상태·요약·카메라 신선도를 구분해 보여줍니다. 알림 목록은 `NEW`와 `ACKED`를 처리할 항목으로, `RESOLVED`를 처리된 항목으로 표시합니다. 경로는 역할과 시설 스코프를 위한 UI 가드이며 서버 권한 검사를 대체하지 않습니다.
 
-### 직원 모드 (시설 스코프)
+### 층별 모니터
 
-Canonical 경로:
+대형 화면과 최소 조작을 위한 모니터는 대시보드 데이터, SSE 이벤트, 알림 REST 조회를 결합합니다. 위험 상태(`STABLE`, `CAUTION`, `DANGER`, `CHECK_NEEDED`)와 카메라 연결 신선도(`LIVE`, `STALE`)는 서로 다른 축입니다. 연결 정보가 오래됐다고 위험 상태가 정상이라는 뜻은 아닙니다.
 
-- `/facilities/:facilityId/dashboard` · 지금 확인할 곳
-- `/facilities/:facilityId/floor/:floorId` · 층별 현황
-- `/facilities/:facilityId/alerts` · 확인한 알림
+음성 안내는 브라우저 `SpeechSynthesis`를 사용하며, 첫 재생은 브라우저 사용자 제스처 정책의 영향을 받습니다. 모니터 설정은 브라우저의 로컬 설정으로, 시설 서버 설정과 동일하다고 가정하지 마세요.
 
-레거시 `/dashboard`, `/dashboard/floor/:floorId`, `/dashboard/alerts`는 redirect 전용입니다. 새 화면을 레거시 경로에 추가하지 마세요.
+#### 현장 모니터 운영 메모
 
-- **지금 확인할 곳**: 로그인 후 첫 화면. 위험/주의/확인필요 공간만 위험 우선 큰 카드. 모두 안정이면 "지금은 모든 곳이 안정적입니다" 안내.
-- **전체 방 상태**: 큰 층 탭 + 큰 카드.
-- **알림 처리**: 현재 `main`의 직원 알림 목록은 `확인 필요` / `확인됨` / `해결됨`으로 나뉜다.
-- **큰 글자·큰 버튼**: 공간명 28px, 상태 24px, 설명 19px, 버튼 21px·높이 56px+ (장갑 착용 대응). 색상 + 한글 문구 + 아이콘을 함께 사용(색약 대응).
-- **공간 상세의 확인**: `확인` 또는 `모두 확인`으로 선택한 알림을 처리한다. 실패하면 이유를 화면에 표시한다. 직원 알림 목록의 2단계 확인 흐름과는 아직 다르다.
-- **현장 문구만**: AI·confidence·detection·camera ID 같은 용어를 직원 화면에서 제거. "침대 주변 움직임이 많습니다" 식 한글 안내(`src/lib/staffCopy.ts`).
-- **화면 모드**: 테마 store는 저장된 설정을 우선하고, 없으면 야간(19~07시)에 다크로 시작한다. 모니터의 `nightMode`와 관리자 레이아웃은 별도이므로 모든 화면의 통합 전환을 전제로 하지 않는다.
-- **소리·진동**: 새 위험 발생 시에만 부드러운 알림음 + 진동(토글 가능, `src/lib/alert.ts`).
+- 직원용 문구는 상태와 다음 행동을 쉬운 한국어로 안내하고, 공간은 확인 우선순위(`DANGER` → `CHECK_NEEDED` → `CAUTION` → `STABLE`)로 정렬합니다. 화면 글자 크기 기준은 `DESIGN.md`의 직원용 서체 규칙(공간명 28px, 상태 24px, 설명 19px)을 참고하세요.
+- 벽면 모니터의 조작은 층 선택, 새로고침, 전체 화면, 소리 전환처럼 현장 사용에 필요한 항목에 집중합니다. 끊긴 카메라 수와 최근 데이터 연결 상태는 위험 표시와 별도로 볼 수 있습니다.
+- 모니터 알림 소리는 기본 활성화 설정이며, 브라우저가 소리를 차단할 수 있습니다. 진동은 지원하는 브라우저에서만 동작합니다. 브라우저 음성 안내의 첫 재생도 사용자 제스처가 필요할 수 있습니다.
 
-### 관리자 모드 (`/facilities/:facilityId/admin/*`)
+### 관리자 화면
 
-상세 이벤트, 시설/층/공간, 모니터 설정, 사용자, edge enrollment 등이 여기 모입니다. 레거시 `/admin/*`는 redirect 전용입니다. 화면 경로는 프론트 라우트이고, HTTP 계약은 백엔드 OpenAPI가 SSOT입니다(`CONTRACT.md`). 관리자 화면은 항상 라이트 모드.
+`/facilities/:facilityId/admin/*` 아래에 이벤트 목록·상세, 시설, 공간, 사용자, 모니터·알림 설정이 있습니다. 엣지 등록 관리 화면은 `SUPER_ADMIN` 권한이 추가로 필요합니다. `/dashboard/*`와 `/admin/*`는 새 화면을 추가하는 경로가 아니라 기존 경로를 보내는 redirect 전용 경로입니다.
 
-## 이슈 근거 영상 (관리자 전용) · 보안 우선
+이벤트 상세의 근거 영상은 실시간 CCTV 관제 기능이 아닙니다. 브라우저는 백엔드가 제공하는 이벤트 미디어 상태를 표시하고, 허용된 경우 인증된 콘텐츠 URL을 사용합니다. 이용 가능 여부·접근 권한·보관 기간·Range 요청 처리는 백엔드와 배포 환경에 달려 있습니다.
 
-이 기능은 **"실시간 CCTV 관제"가 아니라 "AI 위험 감지 근거 영상 확인"**입니다. AI가 위험으로 감지한 **이벤트 구간(감지 10초 전 ~ 10초 후, 약 20초)** 클립만 관리자에게 제공합니다.
+## 운영과 보안 경계
 
-- **권한 분리**: STAFF는 영상 영역 자체가 없고 "영상은 관리자만 확인할 수 있습니다" 안내만 표시. ADMIN/SUPER_ADMIN만 이벤트 상세(`/facilities/:facilityId/admin/events/:eventId`)에서 근거 UI를 볼 수 있습니다.
-- **프론트 연동 경로**: 기본 `/api/v1` 아래 `GET /alerts/:alertId/media`로 메타데이터를 조회하고, 인증된 `/alerts/:alertId/media/content`로 영상을 읽으며, `POST /alerts/:alertId/media/access`에 `action`과 `interactionId`를 보냅니다. 실제 배포 환경의 제공 여부와 HTTP 계약은 백엔드 OpenAPI로 확인합니다.
-- **프론트 보안 경계**: 프론트 라우트 가드는 UX 목적입니다. 최종 권한은 백엔드 JWT/facility/RBAC 가드가 강제합니다.
+- 로그인과 세션은 백엔드가 소유합니다. 브라우저는 httpOnly `app_session` JWT 쿠키를 사용하고 `/api/v1/auth/me`로 세션을 복원합니다. 프런트 `localStorage`는 인증 세션의 원본이 아닙니다.
+- 일반 HTTP API 요청은 `src/services/`를 통합니다. 컴포넌트에서 백엔드를 직접 호출하거나 wire DTO를 UI에 퍼뜨리지 않습니다. HTTP 계약의 단일 기준은 백엔드 OpenAPI입니다([CONTRACT.md](./CONTRACT.md)).
+- 선택된 시설은 HTTP 요청의 `X-Facility-Id`, SSE URL의 `facilityId`로 전달될 수 있습니다. 시설 스코프와 최종 RBAC 검증은 백엔드 책임입니다.
+- Production에서 API를 연결한다면 `VITE_API_BASE_URL`을 절대 HTTPS URL로 설정해야 합니다. 미설정 빌드는 정적 shell을 만들 수 있을 뿐 API 연결을 보장하지 않습니다. `VITE_*` 값은 브라우저 번들에 포함될 수 있으므로 비밀값·토큰을 저장하지 마세요. HTTPS 페이지에서 HTTP API를 호출하지 마세요.
+- 원본 카메라 스트림을 이 프런트에서 보여주는 것으로 설명하지 마세요. 현장 UI에 모델 점수·카메라 ID·내부 모델 설명을 노출하거나 얼굴 인식 기능을 추가하지 않습니다.
+- API 오류, 권한 거부, 미디어 부재는 mock 성공으로 바꾸지 않고 사용자에게 상태로 전달합니다.
 
-## 층별 대형 모니터 현황판 (Floor Monitor Mode)
+자세한 네트워크·상태 흐름과 제한 사항은 [아키텍처 문서](./docs/architecture.md)를 참고하세요.
 
-각 층 간호사실·복도·야간 스테이션의 큰 모니터/TV에 **상시 띄워두는** 화면입니다. 실제 CCTV 영상은 없지만 인원·움직임·위험도·메시지·감지시각이 자동으로 갱신됩니다.
+## 문서
 
-- **경로**: `/facilities/:facilityId/dashboard`, `/facilities/:facilityId/floor/:floorId`, `/facilities/:facilityId/alerts`.
-- **멀리서도 보이는 대형 타이포**: 공간명 42px+, 인원 56px+, 상태 36px+, 설명 28px+.
-- **마우스 없이 자동 갱신**: dashboard SSE와 알림 REST read-model. 위험/확인 필요는 확인 완료 전까지 유지.
-- **조작 최소화**: 층 선택 / 전체 화면 / 알림음 / 카드 클릭 상세. 관리자 메뉴는 노출하지 않습니다.
-- **관리자 설정**: `/facilities/:facilityId/admin/monitor-settings` (이 브라우저에 저장).
-
-**연동**: `src/stores/monitorStore.ts`가 SSE와 알림 REST를 합칩니다. 컴포넌트에서 직접 fetch하지 마세요.
-
-### 적응형 레이아웃
-
-- **주의(CAUTION)**: 톤만 변경, 크기 유지.
-- **위험/확인 필요(DANGER/CHECK_NEEDED)**: 히어로 타일 + 펄스 테두리. 전체 화면 오버레이 없음.
-- **자동 복귀 금지**: 위험/확인 필요는 확인 완료 전까지 유지.
-
-컴포넌트: `src/components/status/RoomStatusTreemap.tsx`, `src/components/status/RoomActionPanel.tsx`.
-
-### TTS 음성 안내
-
-헤더 "음성 안내" 토글(기본 켜짐). 브라우저 `SpeechSynthesis` MVP. Provider 교체는 `src/features/monitor/services/tts/*` 인터페이스만 구현합니다. 첫 음성은 사용자 제스처 이후(자동재생 정책).
-
-## 아키텍처
-
-독립 Vite + React SPA가 [SeeON-Backend](https://github.com/SeniorAILab/SeeON-Backend)의 API를 사용한다. 이 저장소는 `SeniorAILab/SeeON`의 `front/` 이력을 보존해 분리했다. 추출·mirror·rollback은 [MIGRATION.md](./MIGRATION.md), API 소유권과 변경 순서는 [CONTRACT.md](./CONTRACT.md)가 정본이다.
-
-컴포넌트 → services → API mapper 흐름을 유지한다. 최종 인증·시설 스코프·권한 검증은 백엔드가 맡는다.
-
-### 기술 스택
-
-React 18 · TypeScript(strict) · Vite · Tailwind CSS · Zustand · React Router · Recharts · Lucide Icons. shadcn 톤의 경량 UI 프리미티브를 직접 구현해 외부 CLI 의존성을 없앴습니다.
-
-호스팅 목표는 Vercel static SPA입니다. 이 저장소 HEAD에는 Docker/nginx 런타임 파일이 없습니다(이력이 보존). API/SSE/upload/Range reverse proxy는 백엔드·API ingress가 맡는다.
-
----
-
-### 폴더 구조
-
-```
-src/
-├── types/                  index.ts의 공통 타입 + 도메인별 UI/domain 모델
-├── lib/                    utils · labels · roles · format
-├── services/               API/서비스 레이어
-│   ├── apiClient.ts        fetch 래퍼 (`/api/v1`, cookie credentials, X-Facility-Id)
-│   ├── api/                백엔드 endpoint mapper + <domain>/dto/의 wire DTO
-│   ├── authService.ts      로그인/세션 복원
-│   ├── dashboardService.ts 대시보드/공간 상태
-│   └── eventService.ts     이벤트 확인/조치
-├── stores/                 authStore · facilityStore · monitorStore 등
-├── components/             layout, status board, ui primitives ...
-├── features/               dashboard · monitor · admin-events · edge-enrollment (barrel `index.ts`)
-├── pages/                  Login, admin pages, ...
-└── router.tsx              facility-scoped canonical routes + legacy redirects
-```
-
----
-
-### 데이터 모델
-
-프론트 UI/domain 모델은 `src/types/`에 두며, 공통 타입은 `index.ts`, 도메인별 모델은 별도 모듈이 소유합니다. Raw wire DTO는 `src/services/api/<domain>/dto/`에 둡니다. 영속 모델과 HTTP 표면은 백엔드(Prisma + controllers + OpenAPI)가 소유합니다. `SpaceStatus`, `DetectionEvent`, `AlertRule`, `ResidentRiskSummary`, `VideoClip` 등 일부 프론트 타입은 화면 호환용일 수 있으며, 동명 CRUD route가 있다는 뜻이 아닙니다. 계약이 불명확하면 `CONTRACT.md`와 백엔드 OpenAPI를 보세요.
-
-## 백엔드 연동 계약 (요약)
-
-기본 개발 런타임은 실제 백엔드 경로입니다. `src/services/apiClient.ts`가 `VITE_API_BASE_URL`(로컬 기본 `/api/v1`)로 요청하고 `credentials: "include"`를 붙입니다.
-
-### 인증·시설 스코프
-
-- 이메일/비밀번호: `POST /api/v1/auth/login`
-- 부트스트랩: `GET /api/v1/auth/me`
-- 로그아웃: `POST /api/v1/auth/logout`
-- 회원가입/초기 시설 생성: `POST /api/v1/auth/register`
-- 온보딩 시설 생성: `POST /api/v1/facilities`
-- 시설 목록/상세: `GET /api/v1/facilities`, `GET /api/v1/facilities/:id`
-
-브라우저 세션은 백엔드가 발급한 httpOnly `app_session` JWT 쿠키입니다. 프론트 localStorage 세션은 계약이 아닙니다. 시설-bound 사용자는 JWT의 `facilityId`가 스코프이고, `SUPER_ADMIN`은 fetch/XHR에서 `X-Facility-Id`, native `EventSource`에서 `facilityId` query param으로 선택한 시설을 전달합니다.
-
-### 실시간
-
-대시보드 실시간 반영은 `GET /api/v1/dashboard/stream` SSE입니다. `buildSseUrl(facilityId)`는 `EventSource` 제한 때문에 `?facilityId=<id>` query를 사용합니다.
-
-변경 순서, 금지 사항, SSOT 위치는 `CONTRACT.md`가 정본입니다.
-
-## 개발 원칙
-
-- **PoC First · SaaS Ready · Privacy First · Camera Agnostic · Senior-Friendly**
-- 핵심 엔티티는 시설 스코프(`facilityId`). API는 cookie JWT + `X-Facility-Id` / SSE `facilityId` 계약.
-- 얼굴 인식 미사용. 로그인·온보딩·회원가입에 안내(`PrivacyNotice`).
-- 컴포넌트 → services → api mappers 한 방향. OpenAPI와 다른 의미를 UI에서 만들지 않음.
-
-### 로드맵(미구현) 메모
-
-구역/침대 배정 UI, 관심 어르신 UI 등은 라우트에 없을 수 있습니다. 백엔드 route가 준비되면 facility-scoped admin 아래에 배선합니다. 구현 전에 `CONTRACT.md` 순서를 따르세요.
-
-## 보안 · 개인정보
-
-- CCTV 원본 스트림을 프론트에 두지 않습니다. AI 분석 결과(상태·요약)와 허용된 근거 클립만.
-- 라우트 가드는 UX. 서버 권한 검증이 최종 방어선.
-- 세션은 httpOnly JWT 쿠키. localStorage auth 금지.
-- 카피: "감시/추적/관제" 대신 "안전 확인/돌봄 지원".
-
-## 알려진 제약
-
-- 루트 `package.json`은 Node 24.x와 `pnpm@10.32.1`을 지정한다. 설치 재현성은 `pnpm install --frozen-lockfile`로 확인하며, 이 문서는 해당 명령이나 인증된 E2E의 실행 결과를 뜻하지 않는다.
-- Docker/nginx 파일은 standalone 호스팅 때문에 제거되었습니다. 내용이 필요하면 `git show b650a20f52cb8b3946434ffeb6e28abf280c0b1c:nginx.conf` 등으로 이력을 보세요.
-- Vercel Production URL은 `STATIC_READY` 검증 대상이며, 인증된 E2E는 HTTPS API 후속 이슈 범위입니다.
-
-## 문서 지도
-
-| 문서 | 내용 |
+| 문서 | 안내 |
 | --- | --- |
-| [MIGRATION.md](./MIGRATION.md) | 소스 SHA, 추출, mirror, rollback, 레거시 origin, skill 감사 |
-| [CONTRACT.md](./CONTRACT.md) | OpenAPI SSOT, API 변경 순서, 금지 단축 |
-| [AGENTS.md](./AGENTS.md) | 에이전트 가드와 루트 명령 |
-| [DESIGN.md](./DESIGN.md) | 디자인 토큰·컴포넌트 규칙 |
-| [src/AGENTS.md](./src/AGENTS.md) | `src/` 코드 규칙 |
+| [아키텍처](./docs/architecture.md) | 구성도, 데이터 흐름, API·인증·상태 경계, 실패 처리와 제한 |
+| [CONTRACT.md](./CONTRACT.md) | 백엔드 OpenAPI 기준, 계약 변경 순서, API 금지 사항 |
+| [MIGRATION.md](./MIGRATION.md) | 독립 저장소 추출 이력, 미러 규칙, 롤백과 배포 준비 상태 |
+| [DESIGN.md](./DESIGN.md) | 디자인 토큰과 UI 규칙 |
+| [AGENTS.md](./AGENTS.md) · [src/AGENTS.md](./src/AGENTS.md) | 저장소·애플리케이션 개발 규칙 |
+| [CI workflow](./.github/workflows/ci.yml) | 자동 실행되는 품질 게이트 |
 
-## 개발에 쓰는 외부 가이드
-
-Vercel `react-best-practices`(pin `7c180d9044c9ae2b442b567aad4e42a28dd5ed62`)는 감사 후 **커밋하지 않았습니다**. Next.js/RSC 비중이 커서 이 Vite SPA 기본 규칙으로 쓰기 위험합니다. 필요하면 upstream을 그 커밋으로 checkout해 참고만 하세요. 이유는 `MIGRATION.md`에 있습니다.
-
-기준 시설: 행복한요양원 녹양역점. 상단 아트워크는 개념 이미지이며 실제 시설이나 제품 화면을 재현하지 않는다.
-
-[Artwork provenance](./assets/ARTWORK.md) · Original procedural Blender/Cycles reconstruction.
+상단 이미지는 실제 시설이나 배포 화면이 아닌 개념 아트워크입니다. Blender/Cycles로 제작했으며 제품 화면·실제 장비 사진·배포 증거가 아닙니다. 자세한 제작 정보는 [아트워크 출처](./assets/ARTWORK.md)를 확인하세요.

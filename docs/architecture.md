@@ -132,7 +132,7 @@ sequenceDiagram
 - **SSE 오류:** 연결 상태를 `RECONNECTING`으로 표시하고 활성 알림의 REST 동기화를 대체 경로로 사용합니다. 브라우저가 `EventSource` 재연결을 관리합니다. 네트워크 복귀나 문서 재노출 시 즉시 동기화를 요청합니다.
 - **카메라 상태 조회 실패:** 마지막으로 얻은 freshness 값을 유지할 수 있습니다. 따라서 표시된 마지막 상태가 방금 재확인된 상태라고 가정할 수 없습니다.
 - **시설 전환 중 늦게 도착한 응답:** 실행 세대와 현재 시설을 확인해 이전 구독의 응답이 새 화면을 덮지 않게 합니다.
-- **근거 미디어의 준비·접근·재생 실패:** 화면은 `LOADING`, `PENDING`, `READY`, `UNAVAILABLE`, `EXPIRED`, `DELETED`, `DENIED`, `ERROR` 상태를 구분합니다. 취소된 미디어 요청은 폐기하고 화면 이탈 시 video source를 정리합니다. 브라우저의 네이티브 재생·Range 동작과 서버 권한은 별도 검증 대상입니다.
+- **근거 미디어의 준비·접근·재생 실패:** 화면은 `LOADING`, `PENDING`, `READY`, `UNAVAILABLE`, `FEATURE_DISABLED`, `EXPIRED`, `DELETED`, `DENIED`, `ERROR` 상태를 구분합니다. 취소된 미디어 요청은 폐기하고 화면 이탈 시 video source를 정리합니다. 브라우저의 네이티브 재생·Range 동작과 서버 권한은 별도 검증 대상입니다.
 
 ## 소스 지도
 

@@ -64,7 +64,7 @@ pnpm build
 pnpm preview
 ```
 
-실행 명령은 [`package.json`](./package.json)에 정의되어 있으며, GitHub Actions는 고정 lockfile 설치 후 `typecheck`, `lint`, `test`를 실행합니다([CI workflow](./.github/workflows/ci.yml)). 이 문서는 위 명령을 이번 문서 작업에서 실행했다는 뜻이 아닙니다.
+실행 명령은 [`package.json`](./package.json)에 정의되어 있으며, GitHub Actions는 고정 lockfile 설치 후 `typecheck`, `lint`, `test`, `build`를 실행합니다([CI workflow](./.github/workflows/ci.yml)). 이 문서는 위 명령을 이번 문서 작업에서 실행했다는 뜻이 아닙니다.
 
 ## 화면과 기능
 
